@@ -82,7 +82,16 @@ function computeStandings(matches, participantIds) {
         return a.participant_id - b.participant_id;
     });
 
-    return sorted.map((row, i) => ({ ...row, rank: i + 1 }));
+    const result = [];
+    let currentRank = 1;
+    for (let i = 0; i < sorted.length; i++) {
+        const rank = (i > 0 && sorted[i].points === sorted[i - 1].points)
+            ? result[i - 1].rank
+            : currentRank;
+        result.push({ ...sorted[i], rank });
+        currentRank++;
+    }
+    return result;
 }
 
 module.exports = { generateRoundRobin, computeStandings };

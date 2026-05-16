@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 import TournamentBracket from '../components/TournamentBracket';
+import Podium from '../components/Podium';
 import { Link } from 'react-router-dom';
 import { GAMES } from '../constants/games';
 
@@ -331,6 +332,11 @@ export default function TournamentDetailPage() {
                     ))}
                 </div>
             </div>}
+
+            {/* Podium */}
+            {!editing && tournament.status === 'finished' && (
+                <Podium tournament={tournament} />
+            )}
 
             {/* Bracket */}
             {!editing && <TournamentBracket

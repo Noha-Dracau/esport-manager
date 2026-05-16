@@ -53,6 +53,22 @@ export default function ProfilePage() {
 
     if (!profile) return <p>Loading...</p>;
 
+    const activeTournaments = [];
+    const pastTournaments = [];
+    if (myTournaments) {
+        const seen = new Set();
+        [
+            ...(myTournaments.asManager || []),
+            ...(myTournaments.asPlayer  || []),
+            ...(myTournaments.asTeam    || []),
+        ].forEach(t => {
+            if (!seen.has(t.id)) {
+                seen.add(t.id);
+                (t.status === 'finished' ? pastTournaments : activeTournaments).push(t);
+            }
+        });
+    }
+
     return (
         <div style={{ maxWidth: '600px', margin: '0 auto' }}>
             <h1>My profile</h1>
@@ -156,47 +172,36 @@ export default function ProfilePage() {
             <div style={{ background: '#1a1a2e', borderRadius: '12px', padding: '1.5rem', marginBottom: '1.5rem' }}>
                 <h3 style={{ marginTop: 0 }}>My tournaments</h3>
 
-                {/* As a manager */}
-                {myTournaments?.asManager?.length > 0 && (
+                {activeTournaments.length > 0 && (
                     <>
-                        <p style={{ color: '#888', fontSize: '0.85rem', marginBottom: '0.5rem' }}>Tournaments you manage</p>
-                        {myTournaments.asManager.map(t => (
-                            <TournamentRow key={t.id} tournament={t} navigate={navigate} />
+                        <p style={{ color: '#888', fontSize: '0.85rem', marginBottom: '0.5rem' }}>Active tournaments</p>
+                        {activeTournaments.map(t => (
+                            <TournamentRow key={t.id} tournament={t} navigate={navigate} userId={Number(user.userId)} />
                         ))}
                     </>
                 )}
 
-                {/* As a player*/}
-                {myTournaments?.asPlayer?.length > 0 && (
+                {pastTournaments.length > 0 && (
                     <>
-                        <p style={{ color: '#888', fontSize: '0.85rem', margin: '1rem 0 0.5rem' }}>Registered as a player</p>
-                        {myTournaments.asPlayer.map(t => (
-                            <TournamentRow key={t.id} tournament={t} navigate={navigate} />
-                        ))}
+                        <p style={{ color: '#888', fontSize: '0.85rem', margin: activeTournaments.length > 0 ? '1rem 0 0.5rem' : '0 0 0.5rem' }}>Past tournaments</p>
+                        <div style={{ opacity: 0.6 }}>
+                            {pastTournaments.map(t => (
+                                <TournamentRow key={t.id} tournament={t} navigate={navigate} userId={Number(user.userId)} />
+                            ))}
+                        </div>
                     </>
                 )}
 
-                {/* As a team */}
-                {myTournaments?.asTeam?.length > 0 && (
-                    <>
-                        <p style={{ color: '#888', fontSize: '0.85rem', margin: '1rem 0 0.5rem' }}>Registered via your team</p>
-                        {myTournaments.asTeam.map(t => (
-                            <TournamentRow key={t.id} tournament={t} navigate={navigate} />
-                        ))}
-                    </>
+                {activeTournaments.length === 0 && pastTournaments.length === 0 && (
+                    <p style={{ color: '#888', margin: 0 }}>You do not participate in any tournament</p>
                 )}
-
-                {myTournaments?.asManager?.length === 0 &&
-                    myTournaments?.asPlayer?.length === 0 &&
-                    myTournaments?.asTeam?.length === 0 && (
-                        <p style={{ color: '#888', margin: 0 }}>You do not participate in any tournament</p>
-                    )}
             </div>
         </div>
     );
 }
 
-function TournamentRow({ tournament, navigate }) {
+function TournamentRow({ tournament, navigate, userId }) {
+    const isManager = tournament.manager_id === userId;
     return (
         <div
             onClick={() => navigate(`/tournaments/${tournament.id}`)}
@@ -216,10 +221,20 @@ function TournamentRow({ tournament, navigate }) {
             </div>
             <div style={{ flex: 1 }}>
                 <p style={{ margin: 0, fontWeight: 'bold' }}>{tournament.name}</p>
-                <p style={{ margin: 0, color: '#888', fontSize: '0.8rem' }}>{tournament.game} · {tournament.format.replace(/_/g, ' ')}</p>
+                <p style={{ margin: '0.2rem 0 0', color: '#888', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                    <span>{tournament.game} · {tournament.format.replace(/_/g, ' ')}</span>
+                    <span style={{ background: '#2a2a4a', color: '#EAEAEA', fontSize: '0.7rem', padding: '1px 6px', borderRadius: '3px' }}>
+                        {tournament.mode === 'players' ? 'Solo' : 'Teams'}
+                    </span>
+                    {isManager && (
+                        <span style={{ background: '#FCA616', color: '#14203E', fontSize: '0.7rem', padding: '1px 6px', borderRadius: '3px', fontWeight: 'bold' }}>
+                            Manager
+                        </span>
+                    )}
+                </p>
             </div>
             <span style={{
-                fontSize: '0.75rem', padding: '2px 8px', borderRadius: '4px',
+                fontSize: '0.75rem', padding: '2px 8px', borderRadius: '4px', flexShrink: 0,
                 background: tournament.status === 'open' ? '#22c55e22' : tournament.status === 'ongoing' ? '#f59e0b22' : '#a1a1a122',
                 color: tournament.status === 'open' ? '#22c55e' : tournament.status === 'ongoing' ? '#f59e0b' : '#a1a1a1'
             }}>
