@@ -149,6 +149,8 @@ router.delete('/:id', auth, (req, res) => {
     if (!tournament) return res.status(404).json({ error: 'Tournoi introuvable' });
     if (tournament.manager_id !== req.user.id)
         return res.status(403).json({ error: 'Non autorisé' });
+    if (tournament.status === 'ongoing')
+        return res.status(400).json({ error: 'Cannot delete a tournament that is currently ongoing' });
 
     db.prepare('DELETE FROM registrations WHERE tournament_id = ?').run(req.params.id);
     db.prepare('DELETE FROM matches WHERE tournament_id = ?').run(req.params.id);
@@ -252,6 +254,8 @@ router.patch('/:id/bracket/swap', auth, (req, res) => {
     if (!tournament) return res.status(404).json({ error: 'Tournoi introuvable' });
     if (tournament.manager_id !== req.user.id)
         return res.status(403).json({ error: 'Non autorisé' });
+    if (tournament.status !== 'open')
+        return res.status(400).json({ error: 'Cannot swap participants in a tournament that has already started' });
 
     const { matchId, slot, targetMatchId, targetSlot } = req.body;
     // slot et targetSlot valent 'a' ou 'b'
@@ -280,6 +284,8 @@ router.delete('/:id/participants/:participantId', auth, (req, res) => {
     if (!tournament) return res.status(404).json({ error: 'Tournoi introuvable' });
     if (tournament.manager_id !== req.user.id)
         return res.status(403).json({ error: 'Non autorisé' });
+    if (tournament.status !== 'open')
+        return res.status(400).json({ error: 'Cannot remove a participant from a tournament that has already started' });
 
     const pid = Number(req.params.participantId);
 
