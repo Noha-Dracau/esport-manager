@@ -33,7 +33,12 @@ export default function ManageTournamentPage() {
     useEffect(() => { loadTournament(); }, [id]);
 
     async function handleStart() {
-        if (!confirm('Démarrer le tournoi ? Les inscriptions seront fermées.')) return;
+        const today = new Date().toISOString().split('T')[0];
+        const tournamentDate = tournament.date?.split('T')[0] ?? tournament.date;
+        const earlyWarning = tournamentDate > today
+            ? `\n⚠️ La date prévue du tournoi est le ${new Date(tournamentDate).toLocaleDateString('fr-FR')}. Démarrer quand même ?`
+            : '';
+        if (!confirm(`Démarrer le tournoi ? Les inscriptions seront fermées.${earlyWarning}`)) return;
         setBusy(true);
         setError('');
         try {
