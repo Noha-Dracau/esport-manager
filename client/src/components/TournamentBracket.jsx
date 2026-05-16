@@ -75,17 +75,6 @@ export default function TournamentBracket({ tournament, isManager, canScore = fa
         setDragging(null);
     }
 
-    async function handleKick(participantId) {
-        if (!confirm('Remove this participant from the tournament?')) return;
-        try {
-            await api.delete(`/tournaments/${tournament.id}/participants/${participantId}`);
-            await fetchBracket();
-            onRefresh?.();
-        } catch (err) {
-            setError(err.response?.data?.error || 'Error');
-        }
-    }
-
     useEffect(() => { fetchBracket(); }, [tournament.id]);
 
     if (!bracket) return <p style={{ color: '#EAEAEA' }}>Loading bracket…</p>;
@@ -134,7 +123,6 @@ export default function TournamentBracket({ tournament, isManager, canScore = fa
                         dragging={dragging}
                         setDragging={setDragging}
                         onDrop={handleDrop}
-                        onKick={handleKick}
                         onEditMatch={setEditingMatch}
                     />
 
@@ -150,7 +138,6 @@ export default function TournamentBracket({ tournament, isManager, canScore = fa
                             dragging={dragging}
                             setDragging={setDragging}
                             onDrop={handleDrop}
-                            onKick={handleKick}
                             onEditMatch={setEditingMatch}
                             allowSeeding={false}
                         />
@@ -168,7 +155,6 @@ export default function TournamentBracket({ tournament, isManager, canScore = fa
                             dragging={dragging}
                             setDragging={setDragging}
                             onDrop={handleDrop}
-                            onKick={handleKick}
                             onEditMatch={setEditingMatch}
                             allowSeeding={false}
                         />
@@ -190,7 +176,7 @@ export default function TournamentBracket({ tournament, isManager, canScore = fa
 
 function BracketSection({
                             title, matches, names, images, isManager, canScore, tournamentStatus,
-                            dragging, setDragging, onDrop, onKick, onEditMatch, allowSeeding = true
+                            dragging, setDragging, onDrop, onEditMatch, allowSeeding = true
                         }) {
     const rounds = [...new Set(matches.map(m => m.round))].sort((a, b) => a - b);
     const totalRounds = rounds.length;
@@ -236,7 +222,6 @@ function BracketSection({
                                             onDragStart={(slot) => setDragging({ matchId: match.id, slot })}
                                             onDrop={(slot) => onDrop(match.id, slot)}
                                             onDragEnd={() => setDragging(null)}
-                                            onKick={onKick}
                                         />
                                     ))}
                                 </div>
@@ -249,7 +234,7 @@ function BracketSection({
     );
 }
 
-function MatchCard({ match, names, images, isSeedingManager, canScore, onEditScore, dragging, onDragStart, onDrop, onDragEnd, onKick }) {
+function MatchCard({ match, names, images, isSeedingManager, canScore, onEditScore, dragging, onDragStart, onDrop, onDragEnd }) {
     const done = match.status === 'finished';
     const wonByA = done && match.winner === match.participant_a;
     const wonByB = done && match.winner === match.participant_b;
@@ -317,16 +302,6 @@ function MatchCard({ match, names, images, isSeedingManager, canScore, onEditSco
                                         color: isWinner ? '#FCA616' : '#EAEAEA',
                                         fontWeight: 'bold', fontSize: '0.95rem'
                                     }}>{score}</span>
-                                )}
-                                {isSeedingManager && (
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); onKick(pid); }}
-                                        style={{
-                                            padding: '0.1rem 0.4rem', borderRadius: '4px', fontSize: '0.7rem',
-                                            border: '1px solid #e74c3c', background: 'transparent',
-                                            color: '#e74c3c', cursor: 'pointer', flexShrink: 0
-                                        }}
-                                    >✕</button>
                                 )}
                             </>
                         ) : (
