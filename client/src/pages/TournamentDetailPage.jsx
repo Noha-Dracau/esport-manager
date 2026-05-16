@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 import TournamentBracket from '../components/TournamentBracket';
 import { Link } from 'react-router-dom';
+import { GAMES } from '../constants/games';
 
 export default function TournamentDetailPage() {
     const { id } = useParams();
@@ -15,13 +16,16 @@ export default function TournamentDetailPage() {
     const [editing, setEditing]       = useState(false);
     const [form, setForm]             = useState({});
     const [logo, setLogo]             = useState(null);
+    const [customGame, setCustomGame] = useState('');
 
     async function fetchTournament() {
         const res = await api.get(`/tournaments/${id}`);
         setTournament(res.data);
+        const gameInList = GAMES.includes(res.data.game);
+        setCustomGame(gameInList ? '' : res.data.game);
         setForm({
             name:             res.data.name,
-            game:             res.data.game,
+            game:             gameInList ? res.data.game : 'Autre',
             description:      res.data.description || '',
             date:             res.data.date?.split('T')[0] || res.data.date,
             format:           res.data.format,
@@ -57,9 +61,12 @@ export default function TournamentDetailPage() {
 
     async function handleSave() {
         setError('');
+        const gameValue = form.game === 'Autre' ? customGame.trim() : form.game;
+        if (form.game === 'Autre' && !gameValue)
+            return setError('Please specify the game name.');
         try {
             const formData = new FormData();
-            Object.entries(form).forEach(([k, v]) => formData.append(k, v));
+            Object.entries(form).forEach(([k, v]) => formData.append(k, k === 'game' ? gameValue : v));
             if (logo) formData.append('logo', logo);
             await api.patch(`/tournaments/${id}`, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
@@ -174,10 +181,18 @@ export default function TournamentDetailPage() {
                     <div>
                         <label style={labelStyle}>Game</label>
                         <select value={form.game} onChange={e => setForm({ ...form, game: e.target.value })} style={inputStyle}>
-                            {['League of Legends','Valorant','CS2','Fortnite','Rocket League','Overwatch 2','FIFA','Street Fighter 6'].map(g => (
-                                <option key={g} value={g}>{g}</option>
-                            ))}
+                            {GAMES.map(g => <option key={g} value={g}>{g}</option>)}
+                            <option value="Autre">Other (specify)</option>
                         </select>
+                        {form.game === 'Autre' && (
+                            <input
+                                value={customGame}
+                                onChange={e => setCustomGame(e.target.value)}
+                                placeholder="Game name..."
+                                maxLength={50}
+                                style={{ ...inputStyle, marginTop: '0.5rem' }}
+                            />
+                        )}
                     </div>
                     <div>
                         <label style={labelStyle}>Description</label>

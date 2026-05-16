@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
+import { GAMES } from '../constants/games';
 
 export default function CreateTournamentPage() {
     const navigate = useNavigate();
@@ -16,7 +17,8 @@ export default function CreateTournamentPage() {
         max_participants: 8,
         mode:             'players',
     });
-    const [logo, setLogo] = useState(null);
+    const [logo, setLogo]           = useState(null);
+    const [customGame, setCustomGame] = useState('');
 
     function handleChange(e) {
         const updated = { ...form, [e.target.name]: e.target.value };
@@ -27,13 +29,16 @@ export default function CreateTournamentPage() {
 
     async function handleSubmit() {
         setError('');
-        if (!form.name || !form.game || !form.date)
+        const gameValue = form.game === 'Autre' ? customGame.trim() : form.game;
+        if (!form.name || !gameValue || !form.date)
             return setError('Missing mandatory fields.');
+        if (form.game === 'Autre' && !customGame.trim())
+            return setError('Please specify the game name.');
 
         setLoading(true);
         try {
             const formData = new FormData();
-            Object.entries(form).forEach(([k, v]) => formData.append(k, v));
+            Object.entries(form).forEach(([k, v]) => formData.append(k, k === 'game' ? gameValue : v));
             if (logo) formData.append('logo', logo);
 
             const res = await api.post('/tournaments', formData, {
@@ -66,15 +71,18 @@ export default function CreateTournamentPage() {
                     <label style={labelStyle}>Game *</label>
                     <select name="game" value={form.game} onChange={handleChange} style={inputStyle}>
                         <option value="">Select a game</option>
-                        <option value="League of Legends">League of Legends</option>
-                        <option value="Valorant">Valorant</option>
-                        <option value="CS2">CS2</option>
-                        <option value="Fortnite">Fortnite</option>
-                        <option value="Rocket League">Rocket League</option>
-                        <option value="Overwatch 2">Overwatch 2</option>
-                        <option value="FIFA">FIFA</option>
-                        <option value="Street Fighter 6">Street Fighter 6</option>
+                        {GAMES.map(g => <option key={g} value={g}>{g}</option>)}
+                        <option value="Autre">Other (specify)</option>
                     </select>
+                    {form.game === 'Autre' && (
+                        <input
+                            value={customGame}
+                            onChange={e => setCustomGame(e.target.value)}
+                            placeholder="Game name..."
+                            maxLength={50}
+                            style={{ ...inputStyle, marginTop: '0.5rem' }}
+                        />
+                    )}
                 </div>
 
                 {/* Description */}
