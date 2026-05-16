@@ -44,6 +44,8 @@ router.post('/', auth, uploadSingle('logo'), async (req, res) => {
         return res.status(400).json({ error: "Field 'game' must not exceed 50 characters" });
     if (date && date < new Date().toISOString().split('T')[0])
         return res.status(400).json({ error: 'Tournament date cannot be in the past' });
+    if (format === 'round_robin' && Number(max_participants) > 8)
+        return res.status(400).json({ error: 'Round Robin tournaments are limited to 8 participants' });
     const logo_url = req.file ? await saveImage(req.file.buffer) : null;
 
     const result = db.prepare(`
@@ -122,6 +124,10 @@ router.patch('/:id', auth, uploadSingle('logo'), async (req, res) => {
         return res.status(400).json({ error: "Field 'game' must not exceed 50 characters" });
     if (date && date < new Date().toISOString().split('T')[0])
         return res.status(400).json({ error: 'Tournament date cannot be in the past' });
+    const effectiveFormat      = format      || tournament.format;
+    const effectiveMaxParticip = max_participants || tournament.max_participants;
+    if (effectiveFormat === 'round_robin' && Number(effectiveMaxParticip) > 8)
+        return res.status(400).json({ error: 'Round Robin tournaments are limited to 8 participants' });
     const logo_url = req.file ? await saveImage(req.file.buffer) : tournament.logo_url;
 
     db.prepare(`

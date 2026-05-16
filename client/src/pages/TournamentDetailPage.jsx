@@ -189,7 +189,11 @@ export default function TournamentDetailPage() {
                     </div>
                     <div>
                         <label style={labelStyle}>Format</label>
-                        <select value={form.format} onChange={e => setForm({ ...form, format: e.target.value })} style={inputStyle}>
+                        <select value={form.format} onChange={e => {
+                            const newFormat = e.target.value;
+                            const clampedMax = newFormat === 'round_robin' && Number(form.max_participants) > 8 ? 8 : form.max_participants;
+                            setForm({ ...form, format: newFormat, max_participants: clampedMax });
+                        }} style={inputStyle}>
                             <option value="single_elimination">Single elimination</option>
                             <option value="double_elimination">Double elimination</option>
                             <option value="round_robin">Round Robin</option>
@@ -197,7 +201,7 @@ export default function TournamentDetailPage() {
                     </div>
                     <div>
                         <label style={labelStyle}>Max participants: {form.max_participants}</label>
-                        <input type="range" min="4" max="64" step="4" value={form.max_participants}
+                        <input type="range" min="4" max={form.format === 'round_robin' ? 8 : 64} step="4" value={form.max_participants}
                                onChange={e => setForm({ ...form, max_participants: e.target.value })}
                                style={{ width: '100%', accentColor: '#FCA616' }} />
                     </div>

@@ -19,7 +19,10 @@ export default function CreateTournamentPage() {
     const [logo, setLogo] = useState(null);
 
     function handleChange(e) {
-        setForm({ ...form, [e.target.name]: e.target.value });
+        const updated = { ...form, [e.target.name]: e.target.value };
+        if (e.target.name === 'format' && e.target.value === 'round_robin' && Number(updated.max_participants) > 8)
+            updated.max_participants = 8;
+        setForm(updated);
     }
 
     async function handleSubmit() {
@@ -110,13 +113,18 @@ export default function CreateTournamentPage() {
                     <input
                         name="max_participants"
                         type="range"
-                        min="4" max="64" step="4"
+                        min="4"
+                        max={form.format === 'round_robin' ? 8 : 64}
+                        step="4"
                         value={form.max_participants}
                         onChange={handleChange}
                         style={{ width: '100%', accentColor: '#FCA616' }}
                     />
                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#888', fontSize: '0.8rem' }}>
-                        <span>4</span><span>16</span><span>32</span><span>64</span>
+                        {form.format === 'round_robin'
+                            ? <><span>4</span><span>8</span></>
+                            : <><span>4</span><span>16</span><span>32</span><span>64</span></>
+                        }
                     </div>
                 </div>
 
