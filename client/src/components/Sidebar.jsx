@@ -8,7 +8,8 @@ export default function Sidebar() {
 
     return (
         <nav style={{
-            width: '220px', minHeight: '100vh', background: '#ffeac8',
+            width: '220px', height: '100vh', position: 'sticky', top: 0,
+            background: '#ffeac8', overflowY: 'auto',
             display: 'flex', flexDirection: 'column', padding: '1.5rem 1rem', gap: '0.5rem'
         }}>
             {/* clickable logo */}
