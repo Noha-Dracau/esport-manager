@@ -4,4 +4,5 @@ server/uploads/
 .env
 *.db
 CLAUDE.md
+TODO.md
 
