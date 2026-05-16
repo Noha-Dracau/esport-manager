@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const db     = require('../db/database');
 const auth   = require('../middleware/auth');
-const { uploadSingle, saveImage } = require('../middleware/upload');
+const { uploadSingle, saveImage, deleteUpload } = require('../middleware/upload');
 
 // GET /api/users/me - connected user profile
 router.get('/me', auth, (req, res) => {
@@ -55,6 +55,10 @@ router.patch('/me', auth, uploadSingle('avatar'), async (req, res) => {
   if (username && username.length > 30)
     return res.status(400).json({ error: "Field 'username' must not exceed 30 characters" });
 
+  if (req.file) {
+    const current = db.prepare('SELECT avatar_url FROM users WHERE id = ?').get(req.user.id);
+    if (current?.avatar_url) deleteUpload(current.avatar_url);
+  }
   const avatar_url = req.file ? await saveImage(req.file.buffer) : undefined;
 
   const fields = [];

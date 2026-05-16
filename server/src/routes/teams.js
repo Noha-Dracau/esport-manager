@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const db     = require('../db/database');
 const auth   = require('../middleware/auth');
-const { uploadSingle, saveImage } = require('../middleware/upload');
+const { uploadSingle, saveImage, deleteUpload } = require('../middleware/upload');
 
 // GET /api/teams?search=xxx
 router.get('/', (req, res) => {
@@ -68,6 +68,7 @@ router.delete('/:id', auth, (req, res) => {
     if (team.manager_id !== req.user.id)
         return res.status(403).json({ error: 'Unauthorized' });
 
+    deleteUpload(team.logo_url);
     // Removes the team for everyone
     db.prepare('UPDATE users SET team_id = NULL WHERE team_id = ?').run(req.params.id);
     // Removes linked invitations

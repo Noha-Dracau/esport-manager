@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const db     = require('../db/database');
 const auth   = require('../middleware/auth');
-const { uploadSingle, saveImage } = require('../middleware/upload');
+const { uploadSingle, saveImage, deleteUpload } = require('../middleware/upload');
 
 // GET /api/tournaments - list with filter/research
 router.get('/', (req, res) => {
@@ -135,6 +135,7 @@ router.patch('/:id', auth, uploadSingle('logo'), async (req, res) => {
     const effectiveMaxParticip = max_participants || tournament.max_participants;
     if (effectiveFormat === 'round_robin' && Number(effectiveMaxParticip) > 8)
         return res.status(400).json({ error: 'Round Robin tournaments are limited to 8 participants' });
+    if (req.file && tournament.logo_url) deleteUpload(tournament.logo_url);
     const logo_url = req.file ? await saveImage(req.file.buffer) : tournament.logo_url;
 
     db.prepare(`
@@ -165,6 +166,7 @@ router.delete('/:id', auth, (req, res) => {
     if (tournament.status === 'ongoing')
         return res.status(400).json({ error: 'Cannot delete a tournament that is currently ongoing' });
 
+    deleteUpload(tournament.logo_url);
     db.prepare('DELETE FROM registrations WHERE tournament_id = ?').run(req.params.id);
     db.prepare('DELETE FROM matches WHERE tournament_id = ?').run(req.params.id);
     db.prepare('DELETE FROM tournaments WHERE id = ?').run(req.params.id);

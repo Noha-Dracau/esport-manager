@@ -39,4 +39,11 @@ async function saveImage(buffer) {
     return `/uploads/${filename}`;
 }
 
-module.exports = { uploadSingle, saveImage };
+function deleteUpload(urlPath) {
+    if (!urlPath) return;
+    try {
+        fs.unlinkSync(path.join(UPLOADS_DIR, path.basename(urlPath)));
+    } catch { /* file already gone, ignore */ }
+}
+
+module.exports = { uploadSingle, saveImage, deleteUpload };
