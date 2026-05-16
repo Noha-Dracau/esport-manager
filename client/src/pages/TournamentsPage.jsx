@@ -7,6 +7,7 @@ export default function TournamentsPage() {
     const [search, setSearch]           = useState('');
     const [game, setGame]               = useState('');
     const [mode, setMode]               = useState('');
+    const [status, setStatus]           = useState('');
     const [games, setGames]             = useState([]);
     const navigate = useNavigate();
 
@@ -15,9 +16,9 @@ export default function TournamentsPage() {
     }, []);
 
     useEffect(() => {
-        api.get('/tournaments', { params: { search, game, mode } })
+        api.get('/tournaments', { params: { search, game, mode, status } })
             .then(r => setTournaments(r.data));
-    }, [search, game, mode]);
+    }, [search, game, mode, status]);
 
     return (
         <div>
@@ -39,6 +40,12 @@ export default function TournamentsPage() {
                     <option value="">Any</option>
                     <option value="players">Players VS Players</option>
                     <option value="teams">Teams VS Teams</option>
+                </select>
+                <select value={status} onChange={e => setStatus(e.target.value)} style={{ ...inputStyle, flex: 1, minWidth: '150px' }}>
+                    <option value="">All statuses</option>
+                    <option value="open">Open</option>
+                    <option value="ongoing">Ongoing</option>
+                    <option value="finished">Finished</option>
                 </select>
             </div>
 

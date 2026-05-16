@@ -5,13 +5,14 @@ const { uploadSingle, saveImage } = require('../middleware/upload');
 
 // GET /api/tournaments - list with filter/research
 router.get('/', (req, res) => {
-    const { search, game, mode } = req.query;
+    const { search, game, mode, status } = req.query;
     let query = 'SELECT * FROM tournaments WHERE 1=1';
     const params = [];
 
-    if (search) { query += ' AND name LIKE ?'; params.push(`%${search}%`); }
-    if (game)   { query += ' AND game = ?';    params.push(game); }
-    if (mode)   { query += ' AND mode = ?';    params.push(mode); }
+    if (search) { query += ' AND name LIKE ?';   params.push(`%${search}%`); }
+    if (game)   { query += ' AND game = ?';       params.push(game); }
+    if (mode)   { query += ' AND mode = ?';       params.push(mode); }
+    if (status) { query += ' AND status = ?';     params.push(status); }
 
     query += ' ORDER BY CASE WHEN status = \'finished\' THEN 1 ELSE 0 END, created_at DESC';
     res.json(db.prepare(query).all(...params));
