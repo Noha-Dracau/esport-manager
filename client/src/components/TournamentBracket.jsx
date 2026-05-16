@@ -1,11 +1,11 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import api from '../api/axios';
 import ScoreModal from './ScoreModal';
 
 export default function TournamentBracket({ tournament, isManager, canScore = false, onRefresh }) {
     const [bracket, setBracket]       = useState(null);
     const [names, setNames]           = useState({});
-    const [dragging, setDragging]     = useState(null); // { matchId, slot }
+    const [dragging, setDragging]     = useState(null);
     const [error, setError]           = useState('');
     const [editingMatch, setEditingMatch] = useState(null);
 
@@ -29,7 +29,6 @@ export default function TournamentBracket({ tournament, isManager, canScore = fa
             if (m.participant_a) ids.add(m.participant_a);
             if (m.participant_b) ids.add(m.participant_b);
         });
-
         const nameMap = {};
         await Promise.all([...ids].map(async id => {
             try {
@@ -50,9 +49,9 @@ export default function TournamentBracket({ tournament, isManager, canScore = fa
         try {
             await api.post(`/tournaments/${tournament.id}/bracket/generate`);
             await fetchBracket();
-            onRefresh();
+            onRefresh?.();
         } catch (err) {
-            setError(err.response?.data?.error || 'Error');
+            setError(err.response?.data?.error || 'Erreur');
         }
     }
 
@@ -62,35 +61,34 @@ export default function TournamentBracket({ tournament, isManager, canScore = fa
         setError('');
         try {
             await api.patch(`/tournaments/${tournament.id}/bracket/swap`, {
-                matchId:      dragging.matchId,
-                slot:         dragging.slot,
-                targetMatchId,
-                targetSlot
+                matchId: dragging.matchId, slot: dragging.slot, targetMatchId, targetSlot
             });
             await fetchBracket();
         } catch (err) {
-            setError(err.response?.data?.error || 'Error');
+            setError(err.response?.data?.error || 'Erreur');
         }
         setDragging(null);
     }
 
     async function handleKick(participantId) {
-        if (!confirm('Remove this participant from the tournament?')) return;
+        if (!confirm('Retirer ce participant du tournoi ?')) return;
         try {
             await api.delete(`/tournaments/${tournament.id}/participants/${participantId}`);
             await fetchBracket();
-            onRefresh();
+            onRefresh?.();
         } catch (err) {
-            setError(err.response?.data?.error || 'Error');
+            setError(err.response?.data?.error || 'Erreur');
         }
     }
 
     useEffect(() => { fetchBracket(); }, [tournament.id]);
 
-    if (!bracket) return <p style={{ color: '#EAEAEA' }}>Loading of the bracket...</p>;
+    if (!bracket) return <p style={{ color: '#EAEAEA' }}>Chargement du bracket…</p>;
 
-    const rounds = [...new Set(bracket.matches.map(m => m.round))].sort((a, b) => a - b);
-    const totalRounds = rounds.length;
+    const isDouble = tournament.format === 'double_elimination';
+    const winnersMatches = bracket.matches.filter(m => isDouble ? m.bracket === 'winners' : m.bracket !== 'losers' && m.bracket !== 'grand_final');
+    const losersMatches  = bracket.matches.filter(m => m.bracket === 'losers');
+    const gfMatches      = bracket.matches.filter(m => m.bracket === 'grand_final');
 
     return (
         <div style={{ marginTop: '2rem' }}>
@@ -112,74 +110,62 @@ export default function TournamentBracket({ tournament, isManager, canScore = fa
                 <div style={{ background: '#0f0f23', borderRadius: '12px', padding: '2rem', textAlign: 'center' }}>
                     <p style={{ color: '#FFFFFF', margin: 0 }}>
                         {isManager
-                            ? 'Click "Generate" to automatically create the bracket.'
-                            : 'The bracket has not been generated yet.'}
+                            ? 'Cliquer "Generate / Reset" pour créer le bracket.'
+                            : 'Le bracket n\'a pas encore été généré.'}
                     </p>
                 </div>
             )}
 
             {bracket.matches.length > 0 && (
-                <div style={{
-                    overflowX: 'auto',
-                    background: '#1a1a2e',
-                    borderRadius: '12px',
-                    padding: '1.5rem'
-                }}>
-                    <div style={{
-                        display: 'flex',
-                        gap: '2rem',
-                        minWidth: `${totalRounds * 220}px`,
-                        alignItems: 'stretch'
-                    }}>
-                        {rounds.map(round => {
-                            const roundMatches = bracket.matches.filter(m => m.round === round);
-                            const roundName = getRoundName(round, totalRounds);
+                <>
+                    <BracketSection
+                        title={isDouble ? 'Winners Bracket' : 'Bracket'}
+                        matches={winnersMatches}
+                        names={names}
+                        isManager={isManager}
+                        canScore={canScore}
+                        tournamentStatus={tournament.status}
+                        dragging={dragging}
+                        setDragging={setDragging}
+                        onDrop={handleDrop}
+                        onKick={handleKick}
+                        onEditMatch={setEditingMatch}
+                    />
 
-                            return (
-                                <div key={round} style={{
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: '0',
-                                    flex: 1,
-                                    minWidth: '200px'
-                                }}>
-                                    {/* Title of the round */}
-                                    <p style={{
-                                        color: '#FCA616', fontWeight: 'bold', textAlign: 'center',
-                                        marginBottom: '1rem', fontSize: '0.9rem'
-                                    }}>
-                                        {roundName}
-                                    </p>
+                    {isDouble && losersMatches.length > 0 && (
+                        <BracketSection
+                            title="Losers Bracket"
+                            matches={losersMatches}
+                            names={names}
+                            isManager={isManager}
+                            canScore={canScore}
+                            tournamentStatus={tournament.status}
+                            dragging={dragging}
+                            setDragging={setDragging}
+                            onDrop={handleDrop}
+                            onKick={handleKick}
+                            onEditMatch={setEditingMatch}
+                            allowSeeding={false}
+                        />
+                    )}
 
-                                    {/* Matches of the round */}
-                                    <div style={{
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        justifyContent: 'space-around',
-                                        flex: 1,
-                                        gap: '1rem'
-                                    }}>
-                                        {roundMatches.map(match => (
-                                            <MatchCard
-                                                key={match.id}
-                                                match={match}
-                                                names={names}
-                                                isSeedingManager={isManager && tournament.status === 'open' && round === 1}
-                                                canScore={canScore && tournament.status === 'ongoing'}
-                                                onEditScore={() => setEditingMatch(match)}
-                                                dragging={dragging}
-                                                onDragStart={(slot) => setDragging({ matchId: match.id, slot })}
-                                                onDrop={(slot) => handleDrop(match.id, slot)}
-                                                onDragEnd={() => setDragging(null)}
-                                                onKick={handleKick}
-                                            />
-                                        ))}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
+                    {isDouble && gfMatches.length > 0 && (
+                        <BracketSection
+                            title="Grand Final"
+                            matches={gfMatches}
+                            names={names}
+                            isManager={isManager}
+                            canScore={canScore}
+                            tournamentStatus={tournament.status}
+                            dragging={dragging}
+                            setDragging={setDragging}
+                            onDrop={handleDrop}
+                            onKick={handleKick}
+                            onEditMatch={setEditingMatch}
+                            allowSeeding={false}
+                        />
+                    )}
+                </>
             )}
 
             {editingMatch && (
@@ -190,6 +176,66 @@ export default function TournamentBracket({ tournament, isManager, canScore = fa
                     onSubmit={handleSubmitScore}
                 />
             )}
+        </div>
+    );
+}
+
+function BracketSection({
+                            title, matches, names, isManager, canScore, tournamentStatus,
+                            dragging, setDragging, onDrop, onKick, onEditMatch, allowSeeding = true
+                        }) {
+    const rounds = [...new Set(matches.map(m => m.round))].sort((a, b) => a - b);
+    const totalRounds = rounds.length;
+
+    return (
+        <div style={{ marginBottom: '2rem' }}>
+            <h4 style={{ color: '#FCA616', marginBottom: '0.8rem' }}>{title}</h4>
+            <div style={{
+                overflowX: 'auto', background: '#1a1a2e',
+                borderRadius: '12px', padding: '1.5rem'
+            }}>
+                <div style={{
+                    display: 'flex', gap: '2rem',
+                    minWidth: `${totalRounds * 220}px`, alignItems: 'stretch'
+                }}>
+                    {rounds.map(round => {
+                        const roundMatches = matches.filter(m => m.round === round);
+                        return (
+                            <div key={round} style={{
+                                display: 'flex', flexDirection: 'column',
+                                flex: 1, minWidth: '200px'
+                            }}>
+                                <p style={{
+                                    color: '#FCA616', fontWeight: 'bold', textAlign: 'center',
+                                    marginBottom: '1rem', fontSize: '0.9rem'
+                                }}>
+                                    {getRoundName(round, totalRounds, title)}
+                                </p>
+                                <div style={{
+                                    display: 'flex', flexDirection: 'column',
+                                    justifyContent: 'space-around', flex: 1, gap: '1rem'
+                                }}>
+                                    {roundMatches.map(match => (
+                                        <MatchCard
+                                            key={match.id}
+                                            match={match}
+                                            names={names}
+                                            isSeedingManager={allowSeeding && isManager && tournamentStatus === 'open' && round === 1}
+                                            canScore={canScore && tournamentStatus === 'ongoing'}
+                                            onEditScore={() => onEditMatch(match)}
+                                            dragging={dragging}
+                                            onDragStart={(slot) => setDragging({ matchId: match.id, slot })}
+                                            onDrop={(slot) => onDrop(match.id, slot)}
+                                            onDragEnd={() => setDragging(null)}
+                                            onKick={onKick}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
         </div>
     );
 }
@@ -233,8 +279,7 @@ function MatchCard({ match, names, isSeedingManager, canScore, onEditScore, drag
                             background: isDraggingThis ? '#FCA616' : isWinner ? '#14203E' : 'transparent',
                             cursor: isSeedingManager && pid ? 'grab' : 'inherit',
                             opacity: isLoser ? 0.5 : 1,
-                            minHeight: '36px',
-                            transition: 'background 0.15s'
+                            minHeight: '36px', transition: 'background 0.15s'
                         }}
                     >
                         {pid ? (
@@ -243,17 +288,13 @@ function MatchCard({ match, names, isSeedingManager, canScore, onEditScore, drag
                                     width: '24px', height: '24px', borderRadius: '50%',
                                     display: 'flex', alignItems: 'center',
                                     justifyContent: 'center', fontSize: '0.7rem', flexShrink: 0
-                                }}>
-                                    {name[0]?.toUpperCase()}
-                                </div>
+                                }}>{name[0]?.toUpperCase()}</div>
                                 <span style={{
                                     flex: 1, fontSize: '0.85rem',
                                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                                     color: isWinner ? '#FCA616' : '#EAEAEA',
                                     fontWeight: isWinner ? 'bold' : 'normal'
-                                }}>
-                                    {name}
-                                </span>
+                                }}>{name}</span>
                                 {score != null && (
                                     <span style={{
                                         color: isWinner ? '#FCA616' : '#EAEAEA',
@@ -283,18 +324,18 @@ function MatchCard({ match, names, isSeedingManager, canScore, onEditScore, drag
                 <div style={{
                     padding: '0.3rem', borderTop: '1px solid #2a2a4a',
                     fontSize: '0.7rem', color: '#a1a1a1', textAlign: 'center'
-                }}>
-                    {done ? 'Modifier' : 'Saisir le score'}
-                </div>
+                }}>{done ? 'Modifier' : 'Saisir le score'}</div>
             )}
         </div>
     );
 }
 
-function getRoundName(round, totalRounds) {
+function getRoundName(round, totalRounds, sectionTitle) {
+    if (sectionTitle === 'Grand Final') return 'Finale';
+    if (sectionTitle === 'Losers Bracket') return `LB Round ${round}`;
     const remaining = totalRounds - round;
-    if (remaining === 0) return 'Final';
-    if (remaining === 1) return 'Semi finals';
-    if (remaining === 2) return 'Quarter-finals';
+    if (remaining === 0) return sectionTitle === 'Winners Bracket' ? 'Finale WB' : 'Finale';
+    if (remaining === 1) return 'Demi-finales';
+    if (remaining === 2) return 'Quarts de finale';
     return `Round ${round}`;
 }

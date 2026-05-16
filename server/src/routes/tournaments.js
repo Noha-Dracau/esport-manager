@@ -171,7 +171,12 @@ router.delete('/:id/unregister', auth, (req, res) => {
     res.json({ success: true });
 });
 
-const { generateSingleElimination } = require('../utils/bracketGenerator');
+const {
+    generateSingleElimination,
+    generateDoubleElimination,
+    getLoserBracketTarget,
+    getLoserBracketNext
+} = require('../utils/bracketGenerator');
 
 // GET /api/tournaments/:id/bracket — récupère le bracket
 router.get('/:id/bracket', (req, res) => {
@@ -194,7 +199,6 @@ router.post('/:id/bracket/generate', auth, (req, res) => {
     if (tournament.status !== 'open')
         return res.status(400).json({ error: 'Tournoi déjà démarré' });
 
-    // Récupère les participants
     const registrations = db.prepare(
         'SELECT * FROM registrations WHERE tournament_id = ?'
     ).all(req.params.id);
@@ -203,20 +207,29 @@ router.post('/:id/bracket/generate', auth, (req, res) => {
         tournament.mode === 'players' ? r.user_id : r.team_id
     );
 
-    // Supprime l'ancien bracket
     db.prepare('DELETE FROM matches WHERE tournament_id = ?').run(req.params.id);
 
-    // Génère le nouveau
-    const { matches } = generateSingleElimination(participants, tournament.max_participants);
+    let matches;
+    if (tournament.format === 'single_elimination') {
+        ({ matches } = generateSingleElimination(participants, tournament.max_participants));
+    } else if (tournament.format === 'double_elimination') {
+        ({ matches } = generateDoubleElimination(participants, tournament.max_participants));
+    } else {
+        return res.status(400).json({ error: 'Ce format ne nécessite pas de bracket pré-généré' });
+    }
 
     const insert = db.prepare(`
-    INSERT INTO matches (tournament_id, round, position, participant_a, participant_b, winner, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `);
+        INSERT INTO matches
+        (tournament_id, round, position, bracket, participant_a, participant_b, winner, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
 
     const insertMany = db.transaction((matches) => {
         for (const m of matches) {
-            insert.run(tournament.id, m.round, m.position, m.participant_a, m.participant_b, m.winner, m.status);
+            insert.run(
+                tournament.id, m.round, m.position, m.bracket,
+                m.participant_a, m.participant_b, m.winner, m.status
+            );
         }
     });
 
@@ -327,6 +340,252 @@ function advanceSingleElim(tournamentId, match, winnerId) {
 
     // Le slot rempli peut compléter une BYE en aval (cas max_participants > inscrits)
     propagateByes(tournamentId);
+}
+
+/**
+ * Avancement double élim.
+ * Selon le bracket du match terminé, fait avancer gagnant et perdant.
+ */
+function advanceDoubleElim(tournamentId, match, winner, loser, maxParticipants) {
+    const { nextPowerOfTwo } = require('../utils/bracketGenerator');
+    // On a besoin de la taille, recalcule simplement :
+    let size = 1;
+    while (size < maxParticipants) size *= 2;
+    const wbRounds = Math.log2(size);
+    const lbRounds = 2 * (wbRounds - 1);
+
+    if (match.bracket === 'winners') {
+        // 1. Gagnant : monte dans WB
+        const nextWbRound = match.round + 1;
+        if (nextWbRound > wbRounds) {
+            // C'était la finale WB → gagnant va en grand_final slot a
+            const gf = db.prepare(`
+                SELECT * FROM matches WHERE tournament_id = ?
+                AND bracket = 'grand_final' AND round = 1 AND position = 1
+            `).get(tournamentId);
+            if (gf) {
+                db.prepare('UPDATE matches SET participant_a = ? WHERE id = ?').run(winner, gf.id);
+            }
+        } else {
+            const nextWbPosition = Math.ceil(match.position / 2);
+            const slot = match.position % 2 === 1 ? 'a' : 'b';
+            const next = db.prepare(`
+                SELECT * FROM matches WHERE tournament_id = ?
+                AND bracket = 'winners' AND round = ? AND position = ?
+            `).get(tournamentId, nextWbRound, nextWbPosition);
+            if (next) {
+                db.prepare(`UPDATE matches SET participant_${slot} = ? WHERE id = ?`).run(winner, next.id);
+            }
+        }
+
+        // 2. Perdant : descend dans LB
+        if (loser != null) {
+            const target = getLoserBracketTarget(match.round, match.position, size);
+            const lbMatch = db.prepare(`
+                SELECT * FROM matches WHERE tournament_id = ?
+                AND bracket = 'losers' AND round = ? AND position = ?
+            `).get(tournamentId, target.round, target.position);
+            if (lbMatch) {
+                db.prepare(`UPDATE matches SET participant_${target.slot} = ? WHERE id = ?`)
+                    .run(loser, lbMatch.id);
+            }
+        }
+
+    } else if (match.bracket === 'losers') {
+        // Gagnant LB monte
+        const next = getLoserBracketNext(match.round, match.position, size, lbRounds);
+        if (next === null) {
+            // Finale LB → grand_final slot b
+            const gf = db.prepare(`
+                SELECT * FROM matches WHERE tournament_id = ?
+                AND bracket = 'grand_final' AND round = 1 AND position = 1
+            `).get(tournamentId);
+            if (gf) {
+                db.prepare('UPDATE matches SET participant_b = ? WHERE id = ?').run(winner, gf.id);
+            }
+        } else {
+            const nextLb = db.prepare(`
+                SELECT * FROM matches WHERE tournament_id = ?
+                AND bracket = 'losers' AND round = ? AND position = ?
+            `).get(tournamentId, next.round, next.position);
+            if (nextLb) {
+                db.prepare(`UPDATE matches SET participant_${next.slot} = ? WHERE id = ?`)
+                    .run(winner, nextLb.id);
+            }
+        }
+        // Perdant LB : éliminé, rien à faire
+    }
+    // match.bracket === 'grand_final' : tournoi terminé, rien à propager
+    // (la fin est manuelle via le bouton "Terminer le tournoi")
+
+    // Propagation des BYE en cascade après chaque avancement
+    propagateByesDouble(tournamentId, maxParticipants);
+}
+
+/**
+ * Propage les BYE en double élim, en cascade et de manière itérative.
+ *
+ * Cas BYE possibles :
+ *   - WB round R : un seul participant présent → qualifie en WB R+1 ET ne génère pas de perdant pour le LB
+ *     → le slot LB qui attendait ce perdant doit aussi être traité comme BYE (l'autre participant qualifie)
+ *   - LB round R : un seul participant présent → qualifie en LB R+1
+ *   - Grand final : un seul participant présent → c'est qu'on n'a pas géré quelque chose, ne devrait pas arriver
+ */
+function propagateByesDouble(tournamentId, maxParticipants) {
+    let size = 1;
+    while (size < maxParticipants) size *= 2;
+    const wbRounds = Math.log2(size);
+    const lbRounds = 2 * (wbRounds - 1);
+
+    let changed = true;
+    let safety = 100;
+    while (changed && safety-- > 0) {
+        changed = false;
+        const all = db.prepare(
+            'SELECT * FROM matches WHERE tournament_id = ? ORDER BY bracket, round, position'
+        ).all(tournamentId);
+
+        for (const m of all) {
+            if (m.status === 'finished') continue;
+            const hasA = m.participant_a != null;
+            const hasB = m.participant_b != null;
+            if (hasA && hasB) continue;
+
+            // Cas 1 : un seul participant présent — BYE classique
+            if (hasA || hasB) {
+                const present = hasA ? m.participant_a : m.participant_b;
+                if (canSlotStillBeFilled(m, hasA ? 'b' : 'a', all, size, wbRounds, lbRounds)) continue;
+
+                db.prepare(
+                    `UPDATE matches SET winner = ?, loser = NULL, status = 'finished' WHERE id = ?`
+                ).run(present, m.id);
+                propagateByeWinner(m, present, size, wbRounds, lbRounds);
+                changed = true;
+                continue;
+            }
+
+            // Cas 2 : match complètement vide.
+            // On ne le clôture QUE si :
+            //   - aucun slot ne peut plus être rempli
+            //   - ET aucun des deux participants n'est déjà présent (déjà garanti ici car !hasA && !hasB)
+            // On vérifie d'abord si les matchs amont possibles existent et sont déjà finished sans avoir propagé.
+            const canFillA = canSlotStillBeFilled(m, 'a', all, size, wbRounds, lbRounds);
+            const canFillB = canSlotStillBeFilled(m, 'b', all, size, wbRounds, lbRounds);
+            if (!canFillA && !canFillB) {
+                db.prepare(
+                    `UPDATE matches SET winner = NULL, loser = NULL, status = 'finished' WHERE id = ?`
+                ).run(m.id);
+                changed = true;
+            }
+        }
+    }
+}
+
+/**
+ * Détermine si le slot manquant d'un match peut encore être rempli par un match amont.
+ */
+function canSlotStillBeFilled(match, missingSlot, allMatches, size, wbRounds, lbRounds) {
+    const { bracket, round, position } = match;
+
+    if (bracket === 'winners') {
+        if (round === 1) return false;
+        const upstreamPos = missingSlot === 'a' ? 2 * position - 1 : 2 * position;
+        const up = allMatches.find(x =>
+            x.bracket === 'winners' && x.round === round - 1 && x.position === upstreamPos
+        );
+        return !!up && up.status !== 'finished';
+
+    } else if (bracket === 'losers') {
+        const isMajor = round % 2 === 0;
+
+        if (round === 1) {
+            const wbPos = missingSlot === 'a' ? 2 * position - 1 : 2 * position;
+            const wbMatch = allMatches.find(x =>
+                x.bracket === 'winners' && x.round === 1 && x.position === wbPos
+            );
+            return !!wbMatch && wbMatch.status !== 'finished';
+        }
+
+        if (isMajor) {
+            if (missingSlot === 'a') {
+                const wbRound = round / 2 + 1;
+                const wbMatchesInRound = size / Math.pow(2, wbRound);
+                const wbPos = wbMatchesInRound - position + 1;
+                const wbMatch = allMatches.find(x =>
+                    x.bracket === 'winners' && x.round === wbRound && x.position === wbPos
+                );
+                return !!wbMatch && wbMatch.status !== 'finished';
+            } else {
+                const lbPrev = allMatches.find(x =>
+                    x.bracket === 'losers' && x.round === round - 1 && x.position === position
+                );
+                return !!lbPrev && lbPrev.status !== 'finished';
+            }
+        } else {
+            const prevPos = missingSlot === 'a' ? 2 * position - 1 : 2 * position;
+            const lbPrev = allMatches.find(x =>
+                x.bracket === 'losers' && x.round === round - 1 && x.position === prevPos
+            );
+            return !!lbPrev && lbPrev.status !== 'finished';
+        }
+
+    } else if (bracket === 'grand_final') {
+        if (missingSlot === 'a') {
+            const wbFinal = allMatches.find(x =>
+                x.bracket === 'winners' && x.round === wbRounds
+            );
+            return !!wbFinal && wbFinal.status !== 'finished';
+        } else {
+            const lbFinal = allMatches.find(x =>
+                x.bracket === 'losers' && x.round === lbRounds
+            );
+            return !!lbFinal && lbFinal.status !== 'finished';
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Propage le qualifié d'une BYE vers le match aval correspondant.
+ */
+function propagateByeWinner(match, winner, size, wbRounds, lbRounds) {
+    if (match.bracket === 'winners') {
+        // Gagnant : monte dans WB
+        const nextRound = match.round + 1;
+        if (nextRound > wbRounds) {
+            // Finale WB par BYE → GF slot a
+            const gf = db.prepare(`SELECT * FROM matches WHERE tournament_id = ?
+                AND bracket = 'grand_final' AND round = 1 AND position = 1`).get(match.tournament_id);
+            if (gf) db.prepare('UPDATE matches SET participant_a = ? WHERE id = ?').run(winner, gf.id);
+        } else {
+            const nextPos = Math.ceil(match.position / 2);
+            const slot = match.position % 2 === 1 ? 'a' : 'b';
+            const next = db.prepare(`SELECT * FROM matches WHERE tournament_id = ?
+                AND bracket = 'winners' AND round = ? AND position = ?`)
+                .get(match.tournament_id, nextRound, nextPos);
+            if (next) db.prepare(`UPDATE matches SET participant_${slot} = ? WHERE id = ?`).run(winner, next.id);
+        }
+        // Perdant fantôme : on ne propage rien dans le LB (pas de perdant à descendre)
+        // → le slot LB qui aurait reçu ce perdant restera NULL et sera traité par la
+        //   passe suivante de propagateByesDouble comme un slot qui ne peut plus être rempli.
+
+    } else if (match.bracket === 'losers') {
+        const next = getLoserBracketNext(match.round, match.position, size, lbRounds);
+        if (next === null) {
+            // Finale LB par BYE → GF slot b
+            const gf = db.prepare(`SELECT * FROM matches WHERE tournament_id = ?
+                AND bracket = 'grand_final' AND round = 1 AND position = 1`).get(match.tournament_id);
+            if (gf) db.prepare('UPDATE matches SET participant_b = ? WHERE id = ?').run(winner, gf.id);
+        } else {
+            const nextLb = db.prepare(`SELECT * FROM matches WHERE tournament_id = ?
+                AND bracket = 'losers' AND round = ? AND position = ?`)
+                .get(match.tournament_id, next.round, next.position);
+            if (nextLb) db.prepare(`UPDATE matches SET participant_${next.slot} = ? WHERE id = ?`)
+                .run(winner, nextLb.id);
+        }
+    }
+    // grand_final BYE : ne devrait pas arriver
 }
 
 /**
@@ -482,14 +741,13 @@ router.post('/:id/start', auth, (req, res) => {
                 propagateByes(tournament.id);
 
             } else if (tournament.format === 'double_elimination') {
-                // Pas géré côté avancement pour l'instant — on accepte juste le démarrage
-                // pour ne pas bloquer l'UI. Le scoring viendra avec l'implémentation double élim.
                 const count = db.prepare(
                     'SELECT COUNT(*) AS c FROM matches WHERE tournament_id = ?'
                 ).get(tournament.id).c;
                 if (count === 0) {
                     throw new Error('Le bracket n\'a pas été généré');
                 }
+                propagateByesDouble(tournament.id, tournament.max_participants);
             }
 
             db.prepare(`UPDATE tournaments SET status = 'ongoing' WHERE id = ?`).run(tournament.id);
@@ -502,7 +760,6 @@ router.post('/:id/start', auth, (req, res) => {
     }
 });
 
-// PUT /api/tournaments/:id/matches/:matchId — saisie du résultat d'un match
 // PUT /api/tournaments/:id/matches/:matchId — saisie/modification du score
 router.put('/:id/matches/:matchId', auth, (req, res) => {
     const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(req.params.id);
@@ -532,13 +789,21 @@ router.put('/:id/matches/:matchId', auth, (req, res) => {
 
     // En single elim : si on MODIFIE un score déjà saisi, et que le gagnant change,
     // on bloque si des matchs en aval sont déjà joués (l'ancien gagnant est peut-être déjà en train de jouer)
-    if (tournament.format === 'single_elimination' && match.status === 'finished') {
+    const isRealFinished = match.status === 'finished' && match.winner != null;
+    if ((tournament.format === 'single_elimination' || tournament.format === 'double_elimination')
+        && isRealFinished) {
         const winnerChanged = match.winner !== winner;
         if (winnerChanged) {
-            const downstreamPlayed = hasDownstreamPlayed(tournament.id, match);
-            if (downstreamPlayed) {
+            if (tournament.format === 'single_elimination') {
+                const downstreamPlayed = hasDownstreamPlayed(tournament.id, match);
+                if (downstreamPlayed) {
+                    return res.status(409).json({
+                        error: 'Impossible de changer le gagnant : des matchs en aval ont déjà été joués'
+                    });
+                }
+            } else {
                 return res.status(409).json({
-                    error: 'Impossible de changer le gagnant : des matchs en aval ont déjà été joués'
+                    error: 'En double élim, modifier le gagnant n\'est pas autorisé'
                 });
             }
         }
@@ -553,11 +818,15 @@ router.put('/:id/matches/:matchId', auth, (req, res) => {
             `).run(sa, sb, winner, loser, match.id);
 
             if (tournament.format === 'single_elimination') {
-                // Si le gagnant a changé, on doit nettoyer le slot dans le match aval avant d'avancer
-                if (match.status === 'finished' && match.winner !== winner) {
+                if (isRealFinished && match.winner !== winner) {
                     clearDownstreamSlot(tournament.id, match);
                 }
                 advanceSingleElim(tournament.id, match, winner);
+            } else if (tournament.format === 'double_elimination') {
+                if (isRealFinished && match.winner !== winner) {
+                    throw new Error('Modification du gagnant non supportée en double élim');
+                }
+                advanceDoubleElim(tournament.id, match, winner, loser, tournament.max_participants);
             }
             // round_robin : pas d'avancement, le classement est recalculé à la lecture
         });
