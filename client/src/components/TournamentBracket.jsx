@@ -5,6 +5,7 @@ import ScoreModal from './ScoreModal';
 export default function TournamentBracket({ tournament, isManager, canScore = false, onRefresh }) {
     const [bracket, setBracket]       = useState(null);
     const [names, setNames]           = useState({});
+    const [images, setImages]         = useState({});
     const [dragging, setDragging]     = useState(null);
     const [error, setError]           = useState('');
     const [editingMatch, setEditingMatch] = useState(null);
@@ -29,19 +30,23 @@ export default function TournamentBracket({ tournament, isManager, canScore = fa
             if (m.participant_a) ids.add(m.participant_a);
             if (m.participant_b) ids.add(m.participant_b);
         });
-        const nameMap = {};
+        const nameMap  = {};
+        const imageMap = {};
         await Promise.all([...ids].map(async id => {
             try {
                 if (mode === 'players') {
                     const res = await api.get(`/users/${id}`);
-                    nameMap[id] = res.data.username;
+                    nameMap[id]  = res.data.username;
+                    imageMap[id] = res.data.avatar_url || null;
                 } else {
                     const res = await api.get(`/teams/${id}`);
-                    nameMap[id] = res.data.name;
+                    nameMap[id]  = res.data.name;
+                    imageMap[id] = res.data.logo_url || null;
                 }
             } catch { nameMap[id] = `#${id}`; }
         }));
         setNames(nameMap);
+        setImages(imageMap);
     }
 
     async function handleGenerate() {
@@ -122,6 +127,7 @@ export default function TournamentBracket({ tournament, isManager, canScore = fa
                         title={isDouble ? 'Winners Bracket' : 'Bracket'}
                         matches={winnersMatches}
                         names={names}
+                        images={images}
                         isManager={isManager}
                         canScore={canScore}
                         tournamentStatus={tournament.status}
@@ -137,6 +143,7 @@ export default function TournamentBracket({ tournament, isManager, canScore = fa
                             title="Losers Bracket"
                             matches={losersMatches}
                             names={names}
+                            images={images}
                             isManager={isManager}
                             canScore={canScore}
                             tournamentStatus={tournament.status}
@@ -154,6 +161,7 @@ export default function TournamentBracket({ tournament, isManager, canScore = fa
                             title="Grand Final"
                             matches={gfMatches}
                             names={names}
+                            images={images}
                             isManager={isManager}
                             canScore={canScore}
                             tournamentStatus={tournament.status}
@@ -181,7 +189,7 @@ export default function TournamentBracket({ tournament, isManager, canScore = fa
 }
 
 function BracketSection({
-                            title, matches, names, isManager, canScore, tournamentStatus,
+                            title, matches, names, images, isManager, canScore, tournamentStatus,
                             dragging, setDragging, onDrop, onKick, onEditMatch, allowSeeding = true
                         }) {
     const rounds = [...new Set(matches.map(m => m.round))].sort((a, b) => a - b);
@@ -220,6 +228,7 @@ function BracketSection({
                                             key={match.id}
                                             match={match}
                                             names={names}
+                                            images={images}
                                             isSeedingManager={allowSeeding && isManager && tournamentStatus === 'open' && round === 1}
                                             canScore={canScore && tournamentStatus === 'ongoing'}
                                             onEditScore={() => onEditMatch(match)}
@@ -240,7 +249,7 @@ function BracketSection({
     );
 }
 
-function MatchCard({ match, names, isSeedingManager, canScore, onEditScore, dragging, onDragStart, onDrop, onDragEnd, onKick }) {
+function MatchCard({ match, names, images, isSeedingManager, canScore, onEditScore, dragging, onDragStart, onDrop, onDragEnd, onKick }) {
     const done = match.status === 'finished';
     const wonByA = done && match.winner === match.participant_a;
     const wonByB = done && match.winner === match.participant_b;
@@ -284,11 +293,19 @@ function MatchCard({ match, names, isSeedingManager, canScore, onEditScore, drag
                     >
                         {pid ? (
                             <>
-                                <div style={{
-                                    width: '24px', height: '24px', borderRadius: '50%',
-                                    display: 'flex', alignItems: 'center',
-                                    justifyContent: 'center', fontSize: '0.7rem', flexShrink: 0
-                                }}>{name[0]?.toUpperCase()}</div>
+                                {images[pid] ? (
+                                    <img
+                                        src={`http://localhost:3001${images[pid]}`}
+                                        alt={name}
+                                        style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+                                    />
+                                ) : (
+                                    <div style={{
+                                        width: '24px', height: '24px', borderRadius: '50%',
+                                        background: '#2a2a4a', display: 'flex', alignItems: 'center',
+                                        justifyContent: 'center', fontSize: '0.7rem', flexShrink: 0
+                                    }}>{name?.[0]?.toUpperCase()}</div>
+                                )}
                                 <span style={{
                                     flex: 1, fontSize: '0.85rem',
                                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',

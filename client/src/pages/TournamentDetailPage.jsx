@@ -257,22 +257,28 @@ export default function TournamentDetailPage() {
                         }}>
                             {tournament.mode === 'players' ? (
                                 <>
-                                    <div style={{
-                                        width: '32px', height: '32px', borderRadius: '50%',
-                                        background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                                    }}>
-                                        {r.username?.[0]?.toUpperCase()}
-                                    </div>
+                                    {r.avatar_url ? (
+                                        <img src={`http://localhost:3001${r.avatar_url}`} alt={r.username}
+                                            style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
+                                    ) : (
+                                        <div style={{
+                                            width: '32px', height: '32px', borderRadius: '50%',
+                                            background: '#2a2a4a', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                        }}>{r.username?.[0]?.toUpperCase()}</div>
+                                    )}
                                     <span>{r.username}</span>
                                 </>
                             ) : (
                                 <>
-                                    <div style={{
-                                        width: '32px', height: '32px', borderRadius: '8px',
-                                        background: '#1d9e75', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                                    }}>
-                                        {r.team_name?.[0]?.toUpperCase()}
-                                    </div>
+                                    {r.team_logo ? (
+                                        <img src={`http://localhost:3001${r.team_logo}`} alt={r.team_name}
+                                            style={{ width: '32px', height: '32px', borderRadius: '8px', objectFit: 'cover' }} />
+                                    ) : (
+                                        <div style={{
+                                            width: '32px', height: '32px', borderRadius: '8px',
+                                            background: '#1d9e75', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                        }}>{r.team_name?.[0]?.toUpperCase()}</div>
+                                    )}
                                     <span>{r.team_name}</span>
                                 </>
                             )}

@@ -7,6 +7,7 @@ export default function RoundRobinView({ tournamentId, mode, isManager, tourname
     const [matches, setMatches]     = useState([]);
     const [standings, setStandings] = useState([]);
     const [names, setNames]         = useState({});
+    const [images, setImages]       = useState({});
     const [error, setError]         = useState('');
     const [editingMatch, setEditingMatch] = useState(null);
 
@@ -32,15 +33,18 @@ export default function RoundRobinView({ tournamentId, mode, isManager, tourname
         });
         standingsArr.forEach(s => ids.add(s.participant_id));
 
-        const nameMap = {};
+        const nameMap  = {};
+        const imageMap = {};
         await Promise.all([...ids].map(async id => {
             try {
                 const url = mode === 'players' ? `/users/${id}` : `/teams/${id}`;
                 const res = await api.get(url);
-                nameMap[id] = mode === 'players' ? res.data.username : res.data.name;
+                nameMap[id]  = mode === 'players' ? res.data.username : res.data.name;
+                imageMap[id] = mode === 'players' ? (res.data.avatar_url || null) : (res.data.logo_url || null);
             } catch { nameMap[id] = `#${id}`; }
         }));
         setNames(nameMap);
+        setImages(imageMap);
     }
 
     useEffect(() => { loadAll(); }, [tournamentId]);
@@ -117,6 +121,7 @@ export default function RoundRobinView({ tournamentId, mode, isManager, tourname
                                     key={m.id}
                                     match={m}
                                     names={names}
+                                    images={images}
                                     canEdit={canEdit}
                                     onEdit={() => setEditingMatch(m)}
                                 />
@@ -138,7 +143,7 @@ export default function RoundRobinView({ tournamentId, mode, isManager, tourname
     );
 }
 
-function RRMatchCard({ match, names, canEdit, onEdit }) {
+function RRMatchCard({ match, names, images, canEdit, onEdit }) {
     const done = match.status === 'finished';
     const wonByA = done && match.winner === match.participant_a;
     const wonByB = done && match.winner === match.participant_b;
@@ -153,12 +158,14 @@ function RRMatchCard({ match, names, canEdit, onEdit }) {
         >
             <SideRow
                 pid={match.participant_a} name={names[match.participant_a]}
+                image={images[match.participant_a]}
                 score={done ? match.score_a : null}
                 highlighted={wonByA} faded={done && !wonByA}
                 borderBottom
             />
             <SideRow
                 pid={match.participant_b} name={names[match.participant_b]}
+                image={images[match.participant_b]}
                 score={done ? match.score_b : null}
                 highlighted={wonByB} faded={done && !wonByB}
             />
@@ -174,7 +181,7 @@ function RRMatchCard({ match, names, canEdit, onEdit }) {
     );
 }
 
-function SideRow({ pid, name, score, highlighted, faded, borderBottom }) {
+function SideRow({ pid, name, image, score, highlighted, faded, borderBottom }) {
     const label = pid ? (name || `#${pid}`) : 'TBD';
     return (
         <div style={{
@@ -185,6 +192,16 @@ function SideRow({ pid, name, score, highlighted, faded, borderBottom }) {
             opacity: faded ? 0.5 : 1,
             minHeight: '40px'
         }}>
+            {pid && (image ? (
+                <img src={`http://localhost:3001${image}`} alt={label}
+                    style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+            ) : (
+                <div style={{
+                    width: '24px', height: '24px', borderRadius: '50%', background: '#2a2a4a',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '0.7rem', flexShrink: 0
+                }}>{label[0]?.toUpperCase()}</div>
+            ))}
             <span style={{
                 flex: 1,
                 color: highlighted ? '#FCA616' : '#EAEAEA',
