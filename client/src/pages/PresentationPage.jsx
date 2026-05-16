@@ -204,6 +204,95 @@ export default function PresentationPage() {
                         </p>
                     </div>
                 </section>
+
+                {/* Socials Section */}
+                <section style={{ marginTop: '5rem' }}>
+                    <h2
+                        style={{
+                            color: '#FCA616',
+                            fontSize: '2rem',
+                            marginBottom: '2rem',
+                        }}
+                    >
+                        Find Me Online
+                    </h2>
+
+                    <div
+                        style={{
+                            background: '#202040',
+                            padding: '2rem',
+                            borderRadius: '16px',
+                            border: '1px solid rgba(252, 166, 22, 0.2)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '1.5rem',
+                        }}
+                    >
+                        <p
+                            style={{
+                                color: '#D1D1D1',
+                                lineHeight: '1.7',
+                                margin: 0,
+                            }}
+                        >
+                            Feel free to follow me through my personal social media or contact me via my email!
+                        </p>
+
+                        <div
+                            style={{
+                                display: 'flex',
+                                flexWrap: 'wrap',
+                                gap: '1rem',
+                            }}
+                        >
+                            {[
+                                {
+                                    name: 'YouTube',
+                                    link: 'https://www.youtube.com/@Dracau_verwatch',
+                                },
+                                {
+                                    name: 'Twitter',
+                                    link: 'https://x.com/Dracau_verwatch',
+                                },
+                                {
+                                    name: 'Instagram',
+                                    link: 'https://www.instagram.com/dracau_noha',
+                                },
+                                {
+                                    name: 'Email',
+                                    link: 'mailto:noha.robertaltese@gmail.com',
+                                },
+                            ].map((social, index) => (
+                                <a
+                                    key={index}
+                                    href={social.link}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{
+                                        padding: '0.8rem 1.4rem',
+                                        background: '#FCA616',
+                                        color: '#1a1a2e',
+                                        textDecoration: 'none',
+                                        borderRadius: '10px',
+                                        fontWeight: '600',
+                                        transition: '0.2s ease',
+                                        boxShadow: '0 4px 10px rgba(0,0,0,0.2)',
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(-2px)';
+                                        e.currentTarget.style.opacity = '0.9';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(0)';
+                                        e.currentTarget.style.opacity = '1';
+                                    }}
+                                >
+                                    {social.name}
+                                </a>
+                            ))}
+                        </div>
+                    </div>
+                </section>
             </div>
         </div>
     );
