@@ -150,8 +150,8 @@ export default function TournamentDetailPage() {
                 )}
             </div>
 
-            {/* Manage button — visible to manager in all states */}
-            {isManager && (
+            {/* Manage button — visible to manager in all states, hidden while editing */}
+            {isManager && !editing && (
                 <div style={{ marginBottom: '1.5rem' }}>
                     <Link
                         to={`/tournaments/${tournament.id}/manage`}
@@ -223,7 +223,7 @@ export default function TournamentDetailPage() {
             {success && <p style={{ color: '#22c55e', marginBottom: '1rem' }}>{success}</p>}
 
             {/* Registration / Unregistration buttons */}
-            {tournament.status === 'open' && user && (
+            {tournament.status === 'open' && user && !editing && (
                 <div style={{ marginBottom: '1.5rem' }}>
                     {isAlreadyRegistered ? (
                         <button onClick={handleUnregister} style={{ ...btnRed, padding: '0.8rem 2rem' }}>
@@ -242,7 +242,7 @@ export default function TournamentDetailPage() {
             )}
 
             {/* List of participants */}
-            <div style={{ background: '#1a1a2e', borderRadius: '12px', padding: '1.5rem' }}>
+            {!editing && <div style={{ background: '#1a1a2e', borderRadius: '12px', padding: '1.5rem' }}>
                 <h3 style={{ marginTop: 0 }}>
                     Participants ({tournament.registrations?.length} / {tournament.max_participants})
                 </h3>
@@ -279,15 +279,15 @@ export default function TournamentDetailPage() {
                         </div>
                     ))}
                 </div>
-            </div>
+            </div>}
 
             {/* Bracket */}
-            <TournamentBracket
+            {!editing && <TournamentBracket
                 tournament={tournament}
                 isManager={isManager}
                 canScore={false}
                 onRefresh={fetchTournament}
-            />
+            />}
 
         </div>
     );
