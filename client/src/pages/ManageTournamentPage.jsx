@@ -24,7 +24,7 @@ export default function ManageTournamentPage() {
             const res = await api.get(`/tournaments/${id}`);
             setTournament(res.data);
         } catch (err) {
-            setError(err.response?.data?.error || 'Erreur de chargement');
+            setError(err.response?.data?.error || 'Failed to load');
         } finally {
             setLoading(false);
         }
@@ -36,16 +36,16 @@ export default function ManageTournamentPage() {
         const today = new Date().toISOString().split('T')[0];
         const tournamentDate = tournament.date?.split('T')[0] ?? tournament.date;
         const earlyWarning = tournamentDate > today
-            ? `\n⚠️ La date prévue du tournoi est le ${new Date(tournamentDate).toLocaleDateString('fr-FR')}. Démarrer quand même ?`
+            ? `\n⚠️ Tournament date is ${new Date(tournamentDate).toLocaleDateString('en-GB')}. Start anyway?`
             : '';
-        if (!confirm(`Démarrer le tournoi ? Les inscriptions seront fermées.${earlyWarning}`)) return;
+        if (!confirm(`Start tournament? Registration will be closed.${earlyWarning}`)) return;
         setBusy(true);
         setError('');
         try {
             await api.post(`/tournaments/${id}/start`);
             await loadTournament();
         } catch (err) {
-            setError(err.response?.data?.error || 'Erreur au démarrage');
+            setError(err.response?.data?.error || 'Error starting tournament');
         } finally {
             setBusy(false);
         }
@@ -60,8 +60,8 @@ export default function ManageTournamentPage() {
         } catch { /* on continue même si la check échoue */ }
 
         const msg = unfinishedCount > 0
-            ? `Il reste ${unfinishedCount} match(s) non joué(s). Terminer le tournoi quand même ?`
-            : 'Terminer le tournoi ? Cette action est définitive.';
+            ? `${unfinishedCount} unfinished match(es) remaining. Finish tournament anyway?`
+            : 'Finish tournament? This action is irreversible.';
         if (!confirm(msg)) return;
 
         setBusy(true);
@@ -70,27 +70,27 @@ export default function ManageTournamentPage() {
             await api.post(`/tournaments/${id}/finish`);
             await loadTournament();
         } catch (err) {
-            setError(err.response?.data?.error || 'Erreur à la clôture');
+            setError(err.response?.data?.error || 'Error finishing tournament');
         } finally {
             setBusy(false);
         }
     }
 
-    if (loading) return <p style={{ color: '#EAEAEA' }}>Chargement…</p>;
-    if (!tournament) return <p style={{ color: '#EAEAEA' }}>Tournoi introuvable</p>;
+    if (loading) return <p style={{ color: '#EAEAEA' }}>Loading…</p>;
+    if (!tournament) return <p style={{ color: '#EAEAEA' }}>Tournament not found</p>;
 
     if (!isManager) {
         return (
             <div>
-                <h2 style={{ color: '#EAEAEA' }}>Accès refusé</h2>
-                <p style={{ color: '#a1a1a1' }}>Seul le manager du tournoi peut accéder à cette page.</p>
-                <Link to={`/tournaments/${id}`} style={{ color: '#FCA616' }}>← Retour au tournoi</Link>
+                <h2 style={{ color: '#EAEAEA' }}>Access denied</h2>
+                <p style={{ color: '#a1a1a1' }}>Only the tournament manager can access this page.</p>
+                <Link to={`/tournaments/${id}`} style={{ color: '#FCA616' }}>← Back to tournament</Link>
             </div>
         );
     }
 
     const statusLabel = {
-        open: 'Ouvert', ongoing: 'En cours', finished: 'Terminé'
+        open: 'Open', ongoing: 'Ongoing', finished: 'Finished'
     }[tournament.status];
 
     const statusColor = {
@@ -112,13 +112,13 @@ export default function ManageTournamentPage() {
                             marginBottom: '0.5rem', fontSize: '0.85rem'
                         }}
                     >
-                        ← Page publique
+                        ← Public page
                     </button>
                     <h1 style={{ color: '#EAEAEA', margin: '0.3rem 0' }}>
-                        Gestion : {tournament.name}
+                        Managing {tournament.name}
                     </h1>
                     <p style={{ color: '#a1a1a1', margin: 0 }}>
-                        {tournament.game} · {formatLabel(tournament.format)} · {tournament.mode === 'teams' ? 'Équipes' : 'Joueurs'}
+                        {tournament.game} · {formatLabel(tournament.format)} · {tournament.mode === 'teams' ? 'Teams' : 'Players'}
                     </p>
                 </div>
 
@@ -140,7 +140,7 @@ export default function ManageTournamentPage() {
                                 fontWeight: 'bold'
                             }}
                         >
-                            {busy ? 'Démarrage…' : 'Démarrer le tournoi'}
+                            {busy ? 'Starting…' : 'Start tournament'}
                         </button>
                     )}
                     {tournament.status === 'ongoing' && (
@@ -153,7 +153,7 @@ export default function ManageTournamentPage() {
                                 fontWeight: 'bold'
                             }}
                         >
-                            {busy ? 'Clôture…' : 'Terminer le tournoi'}
+                            {busy ? 'Finishing…' : 'Finish tournament'}
                         </button>
                     )}
                 </div>
@@ -172,8 +172,8 @@ export default function ManageTournamentPage() {
                     color: '#a1a1a1', marginBottom: '1rem'
                 }}>
                     {tournament.format === 'round_robin'
-                        ? 'Le calendrier sera généré automatiquement au démarrage. Tous les participants se rencontreront une fois.'
-                        : 'Le bracket sera figé au démarrage. Vérifie le seeding (drag & drop sur la page publique) avant de cliquer "Démarrer".'}
+                        ? 'The schedule will be generated automatically on start. All participants will meet once.'
+                        : 'The bracket will be locked on start. Check the seeding (drag & drop on the public page) before clicking "Start".'}
                 </div>
             )}
 
@@ -201,8 +201,8 @@ export default function ManageTournamentPage() {
 
 function formatLabel(f) {
     return {
-        single_elimination: 'Élimination simple',
-        double_elimination: 'Double élimination',
+        single_elimination: 'Single elimination',
+        double_elimination: 'Double elimination',
         round_robin: 'Round Robin'
     }[f] || f;
 }

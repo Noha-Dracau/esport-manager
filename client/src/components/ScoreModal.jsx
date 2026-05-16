@@ -25,11 +25,11 @@ export default function ScoreModal({ match, names, onClose, onSubmit }) {
         const a = parseInt(scoreA, 10);
         const b = parseInt(scoreB, 10);
         if (!Number.isInteger(a) || !Number.isInteger(b) || a < 0 || b < 0) {
-            setError('Les scores doivent être des entiers positifs.');
+            setError('Scores must be non-negative integers.');
             return;
         }
         if (a === b) {
-            setError('Un match ne peut pas se terminer sur une égalité.');
+            setError('A match cannot end in a draw.');
             return;
         }
         setBusy(true);
@@ -37,7 +37,7 @@ export default function ScoreModal({ match, names, onClose, onSubmit }) {
             await onSubmit(a, b);
             onClose();
         } catch (err) {
-            setError(err.response?.data?.error || 'Erreur lors de la sauvegarde');
+            setError(err.response?.data?.error || 'Error saving score');
         } finally {
             setBusy(false);
         }
@@ -61,7 +61,7 @@ export default function ScoreModal({ match, names, onClose, onSubmit }) {
                 }}
             >
                 <h3 style={{ color: '#FCA616', margin: '0 0 1.5rem', textAlign: 'center' }}>
-                    {isEditing ? 'Modifier le score' : 'Saisir le score'}
+                    {isEditing ? 'Edit score' : 'Enter score'}
                 </h3>
 
                 <div style={{
@@ -112,7 +112,7 @@ export default function ScoreModal({ match, names, onClose, onSubmit }) {
                             color: '#EAEAEA', cursor: 'pointer'
                         }}
                     >
-                        Annuler
+                        Cancel
                     </button>
                     <button
                         onClick={handleSubmit}
@@ -123,7 +123,7 @@ export default function ScoreModal({ match, names, onClose, onSubmit }) {
                             cursor: busy ? 'wait' : 'pointer', fontWeight: 'bold'
                         }}
                     >
-                        {busy ? 'Enregistrement…' : 'Valider'}
+                        {busy ? 'Saving…' : 'Submit'}
                     </button>
                 </div>
             </div>

@@ -21,7 +21,7 @@ export default function RoundRobinView({ tournamentId, mode, isManager, tourname
             setStandings(standingsRes.data);
             await fetchNames(bracketRes.data.matches, standingsRes.data, mode);
         } catch (err) {
-            setError(err.response?.data?.error || 'Erreur de chargement');
+            setError(err.response?.data?.error || 'Failed to load');
         }
     }
 
@@ -66,18 +66,18 @@ export default function RoundRobinView({ tournamentId, mode, isManager, tourname
                 <p style={errorBox}>{error}</p>
             )}
 
-            <h3 style={{ color: '#FCA616', marginTop: 0 }}>Classement</h3>
+            <h3 style={{ color: '#FCA616', marginTop: 0 }}>Standings</h3>
             <div style={tableWrap}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', color: '#EAEAEA' }}>
                     <thead>
                     <tr style={{ borderBottom: '1px solid #2a2a4a' }}>
                         <th style={th}>#</th>
                         <th style={{ ...th, textAlign: 'left' }}>
-                            {mode === 'teams' ? 'Équipe' : 'Joueur'}
+                            {mode === 'teams' ? 'Team' : 'Player'}
                         </th>
-                        <th style={th}>J</th>
-                        <th style={th}>V</th>
-                        <th style={th}>D</th>
+                        <th style={th}>P</th>
+                        <th style={th}>W</th>
+                        <th style={th}>L</th>
                         <th style={th}>Pts</th>
                     </tr>
                     </thead>
@@ -96,14 +96,14 @@ export default function RoundRobinView({ tournamentId, mode, isManager, tourname
                     ))}
                     {standings.length === 0 && (
                         <tr><td colSpan={6} style={{ ...td, color: '#a1a1a1', fontStyle: 'italic' }}>
-                            Aucun match terminé pour le moment.
+                            No matches finished yet.
                         </td></tr>
                     )}
                     </tbody>
                 </table>
             </div>
 
-            <h3 style={{ color: '#FCA616' }}>Matchs</h3>
+            <h3 style={{ color: '#FCA616' }}>Matches</h3>
             {rounds.map(round => {
                 const list = matches.filter(m => m.round === round);
                 return (
@@ -174,7 +174,7 @@ function RRMatchCard({ match, names, images, canEdit, onEdit }) {
                     padding: '0.4rem 0.8rem', borderTop: '1px solid #2a2a4a',
                     fontSize: '0.75rem', color: '#a1a1a1', textAlign: 'center'
                 }}>
-                    {done ? 'Cliquer pour modifier' : 'Cliquer pour saisir le score'}
+                    {done ? 'Click to edit' : 'Click to enter score'}
                 </div>
             )}
         </div>

@@ -56,7 +56,7 @@ export default function TournamentBracket({ tournament, isManager, canScore = fa
             await fetchBracket();
             onRefresh?.();
         } catch (err) {
-            setError(err.response?.data?.error || 'Erreur');
+            setError(err.response?.data?.error || 'Error');
         }
     }
 
@@ -70,25 +70,25 @@ export default function TournamentBracket({ tournament, isManager, canScore = fa
             });
             await fetchBracket();
         } catch (err) {
-            setError(err.response?.data?.error || 'Erreur');
+            setError(err.response?.data?.error || 'Error');
         }
         setDragging(null);
     }
 
     async function handleKick(participantId) {
-        if (!confirm('Retirer ce participant du tournoi ?')) return;
+        if (!confirm('Remove this participant from the tournament?')) return;
         try {
             await api.delete(`/tournaments/${tournament.id}/participants/${participantId}`);
             await fetchBracket();
             onRefresh?.();
         } catch (err) {
-            setError(err.response?.data?.error || 'Erreur');
+            setError(err.response?.data?.error || 'Error');
         }
     }
 
     useEffect(() => { fetchBracket(); }, [tournament.id]);
 
-    if (!bracket) return <p style={{ color: '#EAEAEA' }}>Chargement du bracket…</p>;
+    if (!bracket) return <p style={{ color: '#EAEAEA' }}>Loading bracket…</p>;
 
     const isDouble = tournament.format === 'double_elimination';
     const winnersMatches = bracket.matches.filter(m => isDouble ? m.bracket === 'winners' : m.bracket !== 'losers' && m.bracket !== 'grand_final');
@@ -115,8 +115,8 @@ export default function TournamentBracket({ tournament, isManager, canScore = fa
                 <div style={{ background: '#0f0f23', borderRadius: '12px', padding: '2rem', textAlign: 'center' }}>
                     <p style={{ color: '#FFFFFF', margin: 0 }}>
                         {isManager
-                            ? 'Cliquer "Generate / Reset" pour créer le bracket.'
-                            : 'Le bracket n\'a pas encore été généré.'}
+                            ? 'Click "Generate / Reset" to create the bracket.'
+                            : 'The bracket has not been generated yet.'}
                     </p>
                 </div>
             )}
@@ -341,18 +341,18 @@ function MatchCard({ match, names, images, isSeedingManager, canScore, onEditSco
                 <div style={{
                     padding: '0.3rem', borderTop: '1px solid #2a2a4a',
                     fontSize: '0.7rem', color: '#a1a1a1', textAlign: 'center'
-                }}>{done ? 'Modifier' : 'Saisir le score'}</div>
+                }}>{done ? 'Edit' : 'Enter score'}</div>
             )}
         </div>
     );
 }
 
 function getRoundName(round, totalRounds, sectionTitle) {
-    if (sectionTitle === 'Grand Final') return 'Finale';
+    if (sectionTitle === 'Grand Final') return 'Final';
     if (sectionTitle === 'Losers Bracket') return `LB Round ${round}`;
     const remaining = totalRounds - round;
-    if (remaining === 0) return sectionTitle === 'Winners Bracket' ? 'Finale WB' : 'Finale';
-    if (remaining === 1) return 'Demi-finales';
-    if (remaining === 2) return 'Quarts de finale';
+    if (remaining === 0) return sectionTitle === 'Winners Bracket' ? 'WB Final' : 'Final';
+    if (remaining === 1) return 'Semifinals';
+    if (remaining === 2) return 'Quarterfinals';
     return `Round ${round}`;
 }
