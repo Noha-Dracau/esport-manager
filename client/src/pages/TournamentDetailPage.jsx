@@ -129,14 +129,12 @@ export default function TournamentDetailPage() {
                         {tournament.mode === 'players' ? 'Players VS Players' : 'Teams VS Teams'}
                     </p>
                     <span style={{
-                        background: tournament.status === 'open' ? '#22c55e22' : '#f59e0b22',
-                        color: tournament.status === 'open' ? '#22c55e' : '#f59e0b',
+                        background: tournament.status === 'open' ? '#22c55e22' : tournament.status === 'ongoing' ? '#f59e0b22' : '#a1a1a122',
+                        color: tournament.status === 'open' ? '#22c55e' : tournament.status === 'ongoing' ? '#f59e0b' : '#a1a1a1',
                         padding: '2px 10px', borderRadius: '4px', fontSize: '0.8rem'
                     }}>
-            {tournament.status === 'open' ? 'Open' :
-                tournament.status === 'ongoing' ? 'Ongoing' :
-                    'Finished'}
-          </span>
+                        {tournament.status === 'open' ? 'Open' : tournament.status === 'ongoing' ? 'Ongoing' : 'Finished'}
+                    </span>
                 </div>
 
                 {/* Buttons manager only */}

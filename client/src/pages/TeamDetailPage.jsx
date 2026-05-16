@@ -220,11 +220,11 @@ export default function TeamDetailPage() {
                                 <span style={{ color: '#EAEAEA', fontSize: '0.8rem' }}>{t.game}</span>
                                 <span style={{
                                     fontSize: '0.75rem', padding: '2px 8px', borderRadius: '4px',
-                                    background: t.status === 'open' ? '#22c55e22' : '#f59e0b22',
-                                    color: t.status === 'open' ? '#22c55e' : '#f59e0b'
+                                    background: t.status === 'open' ? '#22c55e22' : t.status === 'ongoing' ? '#f59e0b22' : '#a1a1a122',
+                                    color: t.status === 'open' ? '#22c55e' : t.status === 'ongoing' ? '#f59e0b' : '#a1a1a1'
                                 }}>
-            {t.status === 'open' ? 'Open' : 'Ongoing'}
-          </span>
+                                    {t.status === 'open' ? 'Open' : t.status === 'ongoing' ? 'Ongoing' : 'Finished'}
+                                </span>
                             </div>
                         ))}
                     </div>

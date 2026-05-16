@@ -220,11 +220,11 @@ function TournamentRow({ tournament, navigate }) {
             </div>
             <span style={{
                 fontSize: '0.75rem', padding: '2px 8px', borderRadius: '4px',
-                background: tournament.status === 'open' ? '#22c55e22' : '#f59e0b22',
-                color: tournament.status === 'open' ? '#22c55e' : '#f59e0b'
+                background: tournament.status === 'open' ? '#22c55e22' : tournament.status === 'ongoing' ? '#f59e0b22' : '#a1a1a122',
+                color: tournament.status === 'open' ? '#22c55e' : tournament.status === 'ongoing' ? '#f59e0b' : '#a1a1a1'
             }}>
-        {tournament.status === 'open' ? 'Open' : 'Ongoing'}
-      </span>
+                {tournament.status === 'open' ? 'Open' : tournament.status === 'ongoing' ? 'Ongoing' : 'Finished'}
+            </span>
         </div>
     );
 }

@@ -77,12 +77,12 @@ export default function TournamentsPage() {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
                             <span style={{ color: '#EAEAEA', fontSize: '0.8rem' }}>{t.format.replace(/_/g, ' ')}</span>
                             <span style={{
-                                background: t.status === 'open' ? '#22c55e22' : '#f59e0b22',
-                                color: t.status === 'open' ? '#22c55e' : '#f59e0b',
+                                background: t.status === 'open' ? '#22c55e22' : t.status === 'ongoing' ? '#f59e0b22' : '#a1a1a122',
+                                color: t.status === 'open' ? '#22c55e' : t.status === 'ongoing' ? '#f59e0b' : '#a1a1a1',
                                 padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem'
                             }}>
-        {t.status === 'open' ? 'Open' : 'Ongoing'}
-      </span>
+                                {t.status === 'open' ? 'Open' : t.status === 'ongoing' ? 'Ongoing' : 'Finished'}
+                            </span>
                         </div>
                     </div>
                 ))}
