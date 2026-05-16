@@ -185,7 +185,7 @@ export default function TournamentDetailPage() {
                     </div>
                     <div>
                         <label style={labelStyle}>Date</label>
-                        <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} style={inputStyle} />
+                        <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} min={new Date().toISOString().split('T')[0]} style={inputStyle} />
                     </div>
                     <div>
                         <label style={labelStyle}>Format</label>

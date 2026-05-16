@@ -42,6 +42,8 @@ router.post('/', auth, uploadSingle('logo'), async (req, res) => {
         return res.status(400).json({ error: "Field 'description' must not exceed 500 characters" });
     if (game && game.length > 50)
         return res.status(400).json({ error: "Field 'game' must not exceed 50 characters" });
+    if (date && date < new Date().toISOString().split('T')[0])
+        return res.status(400).json({ error: 'Tournament date cannot be in the past' });
     const logo_url = req.file ? await saveImage(req.file.buffer) : null;
 
     const result = db.prepare(`
@@ -118,6 +120,8 @@ router.patch('/:id', auth, uploadSingle('logo'), async (req, res) => {
         return res.status(400).json({ error: "Field 'description' must not exceed 500 characters" });
     if (game && game.length > 50)
         return res.status(400).json({ error: "Field 'game' must not exceed 50 characters" });
+    if (date && date < new Date().toISOString().split('T')[0])
+        return res.status(400).json({ error: 'Tournament date cannot be in the past' });
     const logo_url = req.file ? await saveImage(req.file.buffer) : tournament.logo_url;
 
     db.prepare(`

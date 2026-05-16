@@ -91,7 +91,7 @@ export default function CreateTournamentPage() {
                 {/* Date */}
                 <div>
                     <label style={labelStyle}>Date *</label>
-                    <input name="date" type="date" value={form.date} onChange={handleChange} style={inputStyle} />
+                    <input name="date" type="date" value={form.date} onChange={handleChange} min={new Date().toISOString().split('T')[0]} style={inputStyle} />
                 </div>
 
                 {/* Format */}
