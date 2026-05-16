@@ -10,6 +10,7 @@ import LoginPage from './pages/LoginPage';
 import CreateTournamentPage from './pages/CreateTournamentPage';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import PresentationPage from './pages/PresentationPage.jsx';
+import ManageTournamentPage from './pages/ManageTournamentPage';
 
 export default function App() {
   return (
@@ -37,6 +38,9 @@ export default function App() {
                   <ProtectedRoute><CreateTournamentPage /></ProtectedRoute>
                 } />
                 <Route path="*" element={<Navigate to="/" />} />
+                <Route path="/tournaments/:id/manage" element={
+                  <ProtectedRoute><ManageTournamentPage /></ProtectedRoute>
+                } />
               </Routes>
             </main>
           </div>

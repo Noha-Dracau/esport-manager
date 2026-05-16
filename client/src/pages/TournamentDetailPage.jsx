@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 import TournamentBracket from '../components/TournamentBracket';
+import { Link } from 'react-router-dom';
 
 export default function TournamentDetailPage() {
     const { id } = useParams();
@@ -124,7 +125,9 @@ export default function TournamentDetailPage() {
                         color: tournament.status === 'open' ? '#22c55e' : '#f59e0b',
                         padding: '2px 10px', borderRadius: '4px', fontSize: '0.8rem'
                     }}>
-            {tournament.status === 'open' ? 'Open' : 'Ongoing'}
+            {tournament.status === 'open' ? 'Open' :
+                tournament.status === 'ongoing' ? 'Ongoing' :
+                    'Finished'}
           </span>
                 </div>
 
@@ -145,6 +148,24 @@ export default function TournamentDetailPage() {
                     </div>
                 )}
             </div>
+
+            {/* Manage button — visible to manager in all states */}
+            {isManager && (
+                <div style={{ marginBottom: '1.5rem' }}>
+                    <Link
+                        to={`/tournaments/${tournament.id}/manage`}
+                        style={{
+                            display: 'inline-block', padding: '0.7rem 1.4rem', borderRadius: '8px',
+                            background: '#FCA616', color: '#14203E', fontWeight: 'bold',
+                            textDecoration: 'none'
+                        }}
+                    >
+                        {tournament.status === 'open' ? '⚙ Manage tournament' :
+                            tournament.status === 'ongoing' ? '⚙ Manage matches' :
+                                '⚙ View results'}
+                    </Link>
+                </div>
+            )}
 
             {/* Edit form */}
             {editing && (
@@ -259,6 +280,7 @@ export default function TournamentDetailPage() {
             <TournamentBracket
                 tournament={tournament}
                 isManager={isManager}
+                canScore={false}
                 onRefresh={fetchTournament}
             />
 

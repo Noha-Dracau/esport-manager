@@ -1,11 +1,21 @@
 import { useEffect, useState, useRef } from 'react';
 import api from '../api/axios';
+import ScoreModal from './ScoreModal';
 
-export default function TournamentBracket({ tournament, isManager, onRefresh }) {
+export default function TournamentBracket({ tournament, isManager, canScore = false, onRefresh }) {
     const [bracket, setBracket]       = useState(null);
     const [names, setNames]           = useState({});
     const [dragging, setDragging]     = useState(null); // { matchId, slot }
     const [error, setError]           = useState('');
+    const [editingMatch, setEditingMatch] = useState(null);
+
+    async function handleSubmitScore(scoreA, scoreB) {
+        await api.put(`/tournaments/${tournament.id}/matches/${editingMatch.id}`, {
+            score_a: scoreA, score_b: scoreB
+        });
+        await fetchBracket();
+        onRefresh?.();
+    }
 
     async function fetchBracket() {
         const res = await api.get(`/tournaments/${tournament.id}/bracket`);
@@ -154,7 +164,9 @@ export default function TournamentBracket({ tournament, isManager, onRefresh }) 
                                                 key={match.id}
                                                 match={match}
                                                 names={names}
-                                                isManager={isManager && tournament.status === 'open' && round === 1}
+                                                isSeedingManager={isManager && tournament.status === 'open' && round === 1}
+                                                canScore={canScore && tournament.status === 'ongoing'}
+                                                onEditScore={() => setEditingMatch(match)}
                                                 dragging={dragging}
                                                 onDragStart={(slot) => setDragging({ matchId: match.id, slot })}
                                                 onDrop={(slot) => handleDrop(match.id, slot)}
@@ -169,37 +181,58 @@ export default function TournamentBracket({ tournament, isManager, onRefresh }) 
                     </div>
                 </div>
             )}
+
+            {editingMatch && (
+                <ScoreModal
+                    match={editingMatch}
+                    names={names}
+                    onClose={() => setEditingMatch(null)}
+                    onSubmit={handleSubmitScore}
+                />
+            )}
         </div>
     );
 }
 
-function MatchCard({ match, names, isManager, dragging, onDragStart, onDrop, onDragEnd, onKick }) {
+function MatchCard({ match, names, isSeedingManager, canScore, onEditScore, dragging, onDragStart, onDrop, onDragEnd, onKick }) {
+    const done = match.status === 'finished';
+    const wonByA = done && match.winner === match.participant_a;
+    const wonByB = done && match.winner === match.participant_b;
+    const bothReady = match.participant_a != null && match.participant_b != null;
+    const clickableForScore = canScore && bothReady;
+
     return (
-        <div style={{
-            background: '#0f0f23',
-            borderRadius: '8px',
-            border: '1px solid #2a2a4a',
-            overflow: 'hidden'
-        }}>
+        <div
+            style={{
+                background: '#0f0f23', borderRadius: '8px',
+                border: '1px solid #2a2a4a', overflow: 'hidden',
+                cursor: clickableForScore ? 'pointer' : 'default'
+            }}
+            onClick={clickableForScore ? onEditScore : undefined}
+        >
             {['a', 'b'].map(slot => {
                 const pid = match[`participant_${slot}`];
                 const name = pid ? (names[pid] || `#${pid}`) : null;
+                const score = done ? match[`score_${slot}`] : null;
                 const isDraggingThis = dragging?.matchId === match.id && dragging?.slot === slot;
+                const isWinner = (slot === 'a' && wonByA) || (slot === 'b' && wonByB);
+                const isLoser  = done && !isWinner && pid != null;
 
                 return (
                     <div
                         key={slot}
-                        draggable={isManager && !!pid}
-                        onDragStart={() => isManager && pid && onDragStart(slot)}
+                        draggable={isSeedingManager && !!pid}
+                        onDragStart={(e) => { e.stopPropagation(); isSeedingManager && pid && onDragStart(slot); }}
                         onDragEnd={onDragEnd}
                         onDragOver={e => { e.preventDefault(); }}
-                        onDrop={() => isManager && onDrop(slot)}
+                        onDrop={(e) => { e.stopPropagation(); isSeedingManager && onDrop(slot); }}
                         style={{
                             display: 'flex', alignItems: 'center', gap: '0.5rem',
                             padding: '0.5rem 0.7rem',
                             borderBottom: slot === 'a' ? '1px solid #2a2a4a' : 'none',
-                            background: isDraggingThis ? '#FCA616' : 'transparent',
-                            cursor: isManager && pid ? 'grab' : 'default',
+                            background: isDraggingThis ? '#FCA616' : isWinner ? '#14203E' : 'transparent',
+                            cursor: isSeedingManager && pid ? 'grab' : 'inherit',
+                            opacity: isLoser ? 0.5 : 1,
                             minHeight: '36px',
                             transition: 'background 0.15s'
                         }}
@@ -208,15 +241,26 @@ function MatchCard({ match, names, isManager, dragging, onDragStart, onDrop, onD
                             <>
                                 <div style={{
                                     width: '24px', height: '24px', borderRadius: '50%',
-                                    background: 'transparent', display: 'flex', alignItems: 'center',
+                                    display: 'flex', alignItems: 'center',
                                     justifyContent: 'center', fontSize: '0.7rem', flexShrink: 0
                                 }}>
                                     {name[0]?.toUpperCase()}
                                 </div>
-                                <span style={{ flex: 1, fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {name}
-                </span>
-                                {isManager && (
+                                <span style={{
+                                    flex: 1, fontSize: '0.85rem',
+                                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                    color: isWinner ? '#FCA616' : '#EAEAEA',
+                                    fontWeight: isWinner ? 'bold' : 'normal'
+                                }}>
+                                    {name}
+                                </span>
+                                {score != null && (
+                                    <span style={{
+                                        color: isWinner ? '#FCA616' : '#EAEAEA',
+                                        fontWeight: 'bold', fontSize: '0.95rem'
+                                    }}>{score}</span>
+                                )}
+                                {isSeedingManager && (
                                     <button
                                         onClick={(e) => { e.stopPropagation(); onKick(pid); }}
                                         style={{
@@ -224,19 +268,25 @@ function MatchCard({ match, names, isManager, dragging, onDragStart, onDrop, onD
                                             border: '1px solid #e74c3c', background: 'transparent',
                                             color: '#e74c3c', cursor: 'pointer', flexShrink: 0
                                         }}
-                                    >
-                                        ✕
-                                    </button>
+                                    >✕</button>
                                 )}
                             </>
                         ) : (
                             <span style={{ color: '#a1a1a1', fontSize: '0.8rem', fontStyle: 'italic' }}>
-                {isManager ? 'drag here' : 'TBD'}
-              </span>
+                                {isSeedingManager ? 'drag here' : 'TBD'}
+                            </span>
                         )}
                     </div>
                 );
             })}
+            {clickableForScore && (
+                <div style={{
+                    padding: '0.3rem', borderTop: '1px solid #2a2a4a',
+                    fontSize: '0.7rem', color: '#a1a1a1', textAlign: 'center'
+                }}>
+                    {done ? 'Modifier' : 'Saisir le score'}
+                </div>
+            )}
         </div>
     );
 }

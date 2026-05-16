@@ -284,4 +284,317 @@ router.delete('/:id/participants/:participantId', auth, (req, res) => {
     res.json({ success: true });
 });
 
+// server/src/routes/tournaments.js
+// (additions — garde tout ce qui existe déjà)
+
+const { generateRoundRobin, computeStandings } = require('../utils/roundRobinGenerator');
+
+// =================================================================
+// HELPERS
+// =================================================================
+
+/**
+ * Renvoie les IDs des participants d'un tournoi (user_id ou team_id selon le mode).
+ */
+function getParticipantIds(tournament) {
+    const rows = db.prepare(
+        'SELECT user_id, team_id FROM registrations WHERE tournament_id = ?'
+    ).all(tournament.id);
+    return tournament.mode === 'teams'
+        ? rows.map(r => r.team_id).filter(Boolean)
+        : rows.map(r => r.user_id).filter(Boolean);
+}
+
+/**
+ * Avancement single elimination :
+ * round R, position P → round R+1, position ceil(P/2).
+ * Slot 'a' si P impair, slot 'b' si P pair (positions 1-indexées, alignées sur le générateur).
+ */
+function advanceSingleElim(tournamentId, match, winnerId) {
+    const nextRound = match.round + 1;
+    const nextPosition = Math.ceil(match.position / 2);
+    const slot = match.position % 2 === 1 ? 'a' : 'b';
+
+    const next = db.prepare(`
+        SELECT * FROM matches
+        WHERE tournament_id = ? AND round = ? AND position = ?
+    `).get(tournamentId, nextRound, nextPosition);
+
+    if (!next) return; // finale
+
+    db.prepare(`UPDATE matches SET participant_${slot} = ? WHERE id = ?`)
+        .run(winnerId, next.id);
+
+    // Le slot rempli peut compléter une BYE en aval (cas max_participants > inscrits)
+    propagateByes(tournamentId);
+}
+
+/**
+ * Vérifie si, en partant du match donné, un match en aval (round suivant et au-delà)
+ * a déjà été joué (status = 'finished').
+ */
+function hasDownstreamPlayed(tournamentId, match) {
+    let round = match.round + 1;
+    let position = Math.ceil(match.position / 2);
+
+    while (true) {
+        const next = db.prepare(`
+            SELECT * FROM matches WHERE tournament_id = ? AND round = ? AND position = ?
+        `).get(tournamentId, round, position);
+        if (!next) return false;
+        if (next.status === 'finished') return true;
+        round += 1;
+        position = Math.ceil(position / 2);
+    }
+}
+
+/**
+ * Vide le slot en aval qui contenait l'ancien gagnant.
+ * Appelé quand on modifie un score et que le gagnant change.
+ */
+function clearDownstreamSlot(tournamentId, match) {
+    const nextRound = match.round + 1;
+    const nextPosition = Math.ceil(match.position / 2);
+    const slot = match.position % 2 === 1 ? 'a' : 'b';
+
+    const next = db.prepare(`
+        SELECT * FROM matches WHERE tournament_id = ? AND round = ? AND position = ?
+    `).get(tournamentId, nextRound, nextPosition);
+    if (!next) return;
+
+    db.prepare(`UPDATE matches SET participant_${slot} = NULL WHERE id = ?`).run(next.id);
+}
+
+/**
+ * Propage les BYE de manière itérative.
+ * Une "vraie" BYE = match avec un seul participant ET dont le slot manquant ne sera jamais rempli
+ * (pas d'upstream pending qui pourrait le combler).
+ * On boucle jusqu'à stabilité car remplir un slot peut déclencher une nouvelle BYE en aval.
+ */
+function propagateByes(tournamentId) {
+    let changed = true;
+    while (changed) {
+        changed = false;
+        const all = db.prepare(
+            'SELECT * FROM matches WHERE tournament_id = ? ORDER BY round, position'
+        ).all(tournamentId);
+        const maxRound = Math.max(...all.map(m => m.round));
+
+        for (const m of all) {
+            if (m.status === 'finished') continue;
+
+            const hasA = m.participant_a != null;
+            const hasB = m.participant_b != null;
+            if (hasA && hasB) continue;   // match complet
+            if (!hasA && !hasB) continue; // match mort, rien à faire
+
+            const present = hasA ? m.participant_a : m.participant_b;
+            const missingSlot = hasA ? 'b' : 'a';
+
+            // Vérifie si le slot manquant peut encore être rempli par un match en amont
+            let upstreamPending = false;
+            if (m.round > 1) {
+                const upstreamPos = missingSlot === 'a' ? 2 * m.position - 1 : 2 * m.position;
+                const up = all.find(x => x.round === m.round - 1 && x.position === upstreamPos);
+                if (up && up.status !== 'finished' &&
+                    (up.participant_a != null || up.participant_b != null)) {
+                    upstreamPending = true;
+                }
+            }
+            if (upstreamPending) continue;
+
+            // Vraie BYE : on clôture le match et on propage
+            db.prepare(
+                `UPDATE matches SET winner = ?, loser = NULL, status = 'finished' WHERE id = ?`
+            ).run(present, m.id);
+
+            if (m.round < maxRound) {
+                const nextPos = Math.ceil(m.position / 2);
+                const nextSlot = m.position % 2 === 1 ? 'a' : 'b';
+                const next = all.find(x => x.round === m.round + 1 && x.position === nextPos);
+                if (next) {
+                    db.prepare(`UPDATE matches SET participant_${nextSlot} = ? WHERE id = ?`)
+                        .run(present, next.id);
+                }
+            }
+            changed = true;
+        }
+    }
+}
+
+/**
+ * Marque le tournoi comme 'finished' si tous les matchs sont joués.
+ */
+function checkTournamentFinished(tournamentId, format) {
+    const remaining = db.prepare(`
+        SELECT COUNT(*) AS c FROM matches
+        WHERE tournament_id = ? AND status != 'finished'
+    `).get(tournamentId).c;
+
+    if (remaining === 0) {
+        db.prepare(`UPDATE tournaments SET status = 'finished' WHERE id = ?`).run(tournamentId);
+    }
+}
+
+// =================================================================
+// ROUTES
+// =================================================================
+
+// POST /api/tournaments/:id/start — démarre le tournoi
+router.post('/:id/start', auth, (req, res) => {
+    const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(req.params.id);
+    if (!tournament) return res.status(404).json({ error: 'Tournoi introuvable' });
+    if (tournament.manager_id !== req.user.id)
+        return res.status(403).json({ error: 'Non autorisé' });
+    if (tournament.status !== 'open')
+        return res.status(400).json({ error: 'Tournoi déjà démarré' });
+
+    const participants = getParticipantIds(tournament);
+    if (participants.length < 2)
+        return res.status(400).json({ error: 'Au moins 2 participants sont requis' });
+
+    try {
+        const tx = db.transaction(() => {
+            if (tournament.format === 'round_robin') {
+                // Pas de seeding préalable pour le round robin : on génère au démarrage
+                db.prepare('DELETE FROM matches WHERE tournament_id = ?').run(tournament.id);
+
+                const schedule = generateRoundRobin(participants);
+                const insert = db.prepare(`
+                    INSERT INTO matches
+                        (tournament_id, round, position, participant_a, participant_b, status, bracket)
+                    VALUES (?, ?, ?, ?, ?, 'pending', 'main')
+                `);
+                for (const m of schedule) {
+                    insert.run(tournament.id, m.round, m.position, m.participant_a, m.participant_b);
+                }
+
+            } else if (tournament.format === 'single_elimination') {
+                // Le bracket a déjà été généré et seedé par le manager (drag & drop).
+                // Vérification : au moins un match round 1 doit exister.
+                const r1Count = db.prepare(
+                    'SELECT COUNT(*) AS c FROM matches WHERE tournament_id = ? AND round = 1'
+                ).get(tournament.id).c;
+                if (r1Count === 0) {
+                    throw new Error('Le bracket n\'a pas été généré');
+                }
+                // Propage les BYE (slots vides au round 1) vers les rounds suivants
+                propagateByes(tournament.id);
+
+            } else if (tournament.format === 'double_elimination') {
+                // Pas géré côté avancement pour l'instant — on accepte juste le démarrage
+                // pour ne pas bloquer l'UI. Le scoring viendra avec l'implémentation double élim.
+                const count = db.prepare(
+                    'SELECT COUNT(*) AS c FROM matches WHERE tournament_id = ?'
+                ).get(tournament.id).c;
+                if (count === 0) {
+                    throw new Error('Le bracket n\'a pas été généré');
+                }
+            }
+
+            db.prepare(`UPDATE tournaments SET status = 'ongoing' WHERE id = ?`).run(tournament.id);
+        });
+        tx();
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Start tournament failed:', err);
+        res.status(400).json({ error: err.message || 'Erreur au démarrage du tournoi' });
+    }
+});
+
+// PUT /api/tournaments/:id/matches/:matchId — saisie du résultat d'un match
+// PUT /api/tournaments/:id/matches/:matchId — saisie/modification du score
+router.put('/:id/matches/:matchId', auth, (req, res) => {
+    const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(req.params.id);
+    if (!tournament) return res.status(404).json({ error: 'Tournoi introuvable' });
+    if (tournament.manager_id !== req.user.id)
+        return res.status(403).json({ error: 'Non autorisé' });
+    if (tournament.status !== 'ongoing')
+        return res.status(400).json({ error: 'Le tournoi n\'est pas en cours' });
+
+    const match = db.prepare(
+        'SELECT * FROM matches WHERE id = ? AND tournament_id = ?'
+    ).get(req.params.matchId, req.params.id);
+    if (!match) return res.status(404).json({ error: 'Match introuvable' });
+    if (match.participant_a == null || match.participant_b == null)
+        return res.status(400).json({ error: 'Match incomplet : un participant est manquant' });
+
+    const { score_a, score_b } = req.body;
+    const sa = Number(score_a);
+    const sb = Number(score_b);
+    if (!Number.isInteger(sa) || !Number.isInteger(sb) || sa < 0 || sb < 0)
+        return res.status(400).json({ error: 'Scores invalides' });
+    if (sa === sb)
+        return res.status(400).json({ error: 'Un match ne peut pas se terminer sur une égalité' });
+
+    const winner = sa > sb ? match.participant_a : match.participant_b;
+    const loser  = sa > sb ? match.participant_b : match.participant_a;
+
+    // En single elim : si on MODIFIE un score déjà saisi, et que le gagnant change,
+    // on bloque si des matchs en aval sont déjà joués (l'ancien gagnant est peut-être déjà en train de jouer)
+    if (tournament.format === 'single_elimination' && match.status === 'finished') {
+        const winnerChanged = match.winner !== winner;
+        if (winnerChanged) {
+            const downstreamPlayed = hasDownstreamPlayed(tournament.id, match);
+            if (downstreamPlayed) {
+                return res.status(409).json({
+                    error: 'Impossible de changer le gagnant : des matchs en aval ont déjà été joués'
+                });
+            }
+        }
+    }
+
+    try {
+        const tx = db.transaction(() => {
+            db.prepare(`
+                UPDATE matches
+                SET score_a = ?, score_b = ?, winner = ?, loser = ?, status = 'finished'
+                WHERE id = ?
+            `).run(sa, sb, winner, loser, match.id);
+
+            if (tournament.format === 'single_elimination') {
+                // Si le gagnant a changé, on doit nettoyer le slot dans le match aval avant d'avancer
+                if (match.status === 'finished' && match.winner !== winner) {
+                    clearDownstreamSlot(tournament.id, match);
+                }
+                advanceSingleElim(tournament.id, match, winner);
+            }
+            // round_robin : pas d'avancement, le classement est recalculé à la lecture
+        });
+        tx();
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Set match score failed:', err);
+        res.status(500).json({ error: 'Erreur à l\'enregistrement du score' });
+    }
+});
+
+// GET /api/tournaments/:id/standings — classement round-robin
+router.get('/:id/standings', (req, res) => {
+    const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(req.params.id);
+    if (!tournament) return res.status(404).json({ error: 'Tournoi introuvable' });
+    if (tournament.format !== 'round_robin')
+        return res.status(400).json({ error: 'Classement disponible uniquement en round robin' });
+
+    const participants = getParticipantIds(tournament);
+    const matches = db.prepare(
+        'SELECT * FROM matches WHERE tournament_id = ?'
+    ).all(tournament.id);
+
+    res.json(computeStandings(matches, participants));
+});
+
+// POST /api/tournaments/:id/finish — clôture manuelle du tournoi
+router.post('/:id/finish', auth, (req, res) => {
+    const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(req.params.id);
+    if (!tournament) return res.status(404).json({ error: 'Tournoi introuvable' });
+    if (tournament.manager_id !== req.user.id)
+        return res.status(403).json({ error: 'Non autorisé' });
+    if (tournament.status !== 'ongoing')
+        return res.status(400).json({ error: 'Le tournoi n\'est pas en cours' });
+
+    db.prepare(`UPDATE tournaments SET status = 'finished' WHERE id = ?`).run(tournament.id);
+    res.json({ success: true });
+});
+
 module.exports = router;
