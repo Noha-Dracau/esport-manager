@@ -17,6 +17,7 @@ export default function TournamentDetailPage() {
     const [form, setForm]             = useState({});
     const [logo, setLogo]             = useState(null);
     const [customGame, setCustomGame] = useState('');
+    const [hoveredTeam, setHoveredTeam] = useState(null);
 
     async function fetchTournament() {
         const res = await api.get(`/tournaments/${id}`);
@@ -292,7 +293,18 @@ export default function TournamentDetailPage() {
                                     <span style={{ flex: 1 }}>{r.username}</span>
                                 </>
                             ) : (
-                                <>
+                                <Link
+                                    to={`/teams/${r.team_id}`}
+                                    onMouseEnter={() => setHoveredTeam(r.team_id)}
+                                    onMouseLeave={() => setHoveredTeam(null)}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: '0.8rem', flex: 1,
+                                        textDecoration: 'none', color: 'inherit', cursor: 'pointer',
+                                        borderRadius: '6px', padding: '2px 4px',
+                                        background: hoveredTeam === r.team_id ? '#2a2a4a' : 'transparent',
+                                        transition: 'background 0.15s'
+                                    }}
+                                >
                                     {r.team_logo ? (
                                         <img src={`http://localhost:3001${r.team_logo}`} alt={r.team_name}
                                             style={{ width: '32px', height: '32px', borderRadius: '8px', objectFit: 'cover' }} />
@@ -303,7 +315,7 @@ export default function TournamentDetailPage() {
                                         }}>{r.team_name?.[0]?.toUpperCase()}</div>
                                     )}
                                     <span style={{ flex: 1 }}>{r.team_name}</span>
-                                </>
+                                </Link>
                             )}
                             {isManager && tournament.status === 'open' && (
                                 <button
