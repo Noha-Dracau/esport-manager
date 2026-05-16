@@ -52,7 +52,7 @@ export default function TournamentsPage() {
                     <div
                         key={t.id}
                         onClick={() => navigate(`/tournaments/${t.id}`)}
-                        style={cardStyle}
+                        style={cardStyle(t.status)}
                     >
                         <img
                             src={t.logo_url ? `http://localhost:3001${t.logo_url}` : '/default-tournament.png'}
@@ -89,8 +89,9 @@ const inputStyle = {
     border: '1px solid #333', background: '#1a1a2e', color: '#fff', flex: 1
 };
 
-const cardStyle = {
+const cardStyle = (status) => ({
     background: '#1a1a2e', borderRadius: '12px', padding: '1rem',
     cursor: 'pointer', transition: 'transform 0.2s',
-    border: '1px solid #2a2a4a'
-};
+    border: '1px solid #2a2a4a',
+    opacity: status === 'finished' ? 0.6 : 1,
+});

@@ -13,7 +13,7 @@ router.get('/', (req, res) => {
     if (game)   { query += ' AND game = ?';    params.push(game); }
     if (mode)   { query += ' AND mode = ?';    params.push(mode); }
 
-    query += ' ORDER BY created_at DESC';
+    query += ' ORDER BY CASE WHEN status = \'finished\' THEN 1 ELSE 0 END, created_at DESC';
     res.json(db.prepare(query).all(...params));
 });
 
