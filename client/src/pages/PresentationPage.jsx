@@ -168,7 +168,7 @@ export default function PresentationPage() {
                         }}
                     >
                         <p>
-                            Noha is a French developer living in Lyon and studying at{' '}
+                            Noha Robert--Altese is a French developer living in Lyon and studying at{' '}
                             <a
                                 href="https://www.epita.fr/"
                                 target="_blank"
