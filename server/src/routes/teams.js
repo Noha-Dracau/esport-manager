@@ -1,15 +1,7 @@
 const router = require('express').Router();
 const db     = require('../db/database');
 const auth   = require('../middleware/auth');
-const multer = require('multer');
-const path   = require('path');
-
-const upload = multer({
-    storage: multer.diskStorage({
-        destination: (req, file, cb) => cb(null, 'uploads/'),
-        filename:    (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname))
-    })
-});
+const { uploadSingle, saveImage } = require('../middleware/upload');
 
 // GET /api/teams?search=xxx
 router.get('/', (req, res) => {
@@ -44,11 +36,11 @@ router.get('/:id', (req, res) => {
 });
 
 // POST /api/teams - create a team
-router.post('/', auth, upload.single('logo'), (req, res) => {
+router.post('/', auth, uploadSingle('logo'), async (req, res) => {
     const { name } = req.body;
     if (name && name.length > 50)
         return res.status(400).json({ error: "Field 'name' must not exceed 50 characters" });
-    const logo_url = req.file ? `/uploads/${req.file.filename}` : null;
+    const logo_url = req.file ? await saveImage(req.file.buffer) : null;
 
     // Asserts the user is not in a team
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);

@@ -1,14 +1,7 @@
 const router = require('express').Router();
 const db     = require('../db/database');
 const auth   = require('../middleware/auth');
-const multer = require('multer');
-const path   = require('path');
-
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, 'uploads/'),
-    filename:    (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname))
-});
-const upload = multer({ storage });
+const { uploadSingle, saveImage } = require('../middleware/upload');
 
 // GET /api/tournaments - list with filter/research
 router.get('/', (req, res) => {
@@ -41,7 +34,7 @@ router.get('/:id', (req, res) => {
 });
 
 // POST /api/tournaments - create a tournament (auth required)
-router.post('/', auth, upload.single('logo'), (req, res) => {
+router.post('/', auth, uploadSingle('logo'), async (req, res) => {
     const { name, game, description, date, format, max_participants, mode } = req.body;
     if (name && name.length > 100)
         return res.status(400).json({ error: "Field 'name' must not exceed 100 characters" });
@@ -49,7 +42,7 @@ router.post('/', auth, upload.single('logo'), (req, res) => {
         return res.status(400).json({ error: "Field 'description' must not exceed 500 characters" });
     if (game && game.length > 50)
         return res.status(400).json({ error: "Field 'game' must not exceed 50 characters" });
-    const logo_url = req.file ? `/uploads/${req.file.filename}` : null;
+    const logo_url = req.file ? await saveImage(req.file.buffer) : null;
 
     const result = db.prepare(`
     INSERT INTO tournaments (name, game, logo_url, description, date, format, max_participants, mode, manager_id)
@@ -110,7 +103,7 @@ router.post('/:id/register', auth, (req, res) => {
     res.json({ success: true });
 });
 // PATCH /api/tournaments/:id - modify a tournament (manager only)
-router.patch('/:id', auth, upload.single('logo'), (req, res) => {
+router.patch('/:id', auth, uploadSingle('logo'), async (req, res) => {
     const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(req.params.id);
     if (!tournament) return res.status(404).json({ error: 'Tournoi introuvable' });
     if (tournament.manager_id !== req.user.id)
@@ -125,7 +118,7 @@ router.patch('/:id', auth, upload.single('logo'), (req, res) => {
         return res.status(400).json({ error: "Field 'description' must not exceed 500 characters" });
     if (game && game.length > 50)
         return res.status(400).json({ error: "Field 'game' must not exceed 50 characters" });
-    const logo_url = req.file ? `/uploads/${req.file.filename}` : tournament.logo_url;
+    const logo_url = req.file ? await saveImage(req.file.buffer) : tournament.logo_url;
 
     db.prepare(`
     UPDATE tournaments

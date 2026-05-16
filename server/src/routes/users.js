@@ -1,15 +1,7 @@
 const router = require('express').Router();
 const db     = require('../db/database');
 const auth   = require('../middleware/auth');
-const multer = require('multer');
-const path   = require('path');
-
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => cb(null, 'uploads/'),
-    filename:    (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname))
-  })
-});
+const { uploadSingle, saveImage } = require('../middleware/upload');
 
 // GET /api/users/me - connected user profile
 router.get('/me', auth, (req, res) => {
@@ -58,12 +50,12 @@ router.get('/:id', (req, res) => {
 });
 
 // PATCH /api/users/me - change profile
-router.patch('/me', auth, upload.single('avatar'), (req, res) => {
+router.patch('/me', auth, uploadSingle('avatar'), async (req, res) => {
   const { username } = req.body;
   if (username && username.length > 30)
     return res.status(400).json({ error: "Field 'username' must not exceed 30 characters" });
 
-  const avatar_url = req.file ? `/uploads/${req.file.filename}` : undefined;
+  const avatar_url = req.file ? await saveImage(req.file.buffer) : undefined;
 
   const fields = [];
   const params = [];
