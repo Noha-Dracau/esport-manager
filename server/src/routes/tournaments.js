@@ -14,7 +14,7 @@ router.get('/', (req, res) => {
     if (mode)   { query += ' AND mode = ?';       params.push(mode); }
     if (status) { query += ' AND status = ?';     params.push(status); }
 
-    query += ' ORDER BY CASE WHEN status = \'finished\' THEN 1 ELSE 0 END, created_at DESC';
+    query += ' ORDER BY CASE WHEN status = \'finished\' THEN 1 ELSE 0 END, CASE WHEN status != \'finished\' THEN date END ASC, CASE WHEN status = \'finished\' THEN date END DESC';
     res.json(db.prepare(query).all(...params));
 });
 
