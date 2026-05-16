@@ -65,34 +65,34 @@ router.post('/', auth, uploadSingle('logo'), async (req, res) => {
 
 router.post('/:id/register', auth, (req, res) => {
     const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(req.params.id);
-    if (!tournament) return res.status(404).json({ error: 'Tournoi introuvable' });
+    if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
     if (tournament.status !== 'open')
-        return res.status(400).json({ error: 'Ce tournoi n\'est plus ouvert aux inscriptions' });
+        return res.status(400).json({ error: 'This tournament is no longer open for registration' });
 
     const count = db.prepare(
         'SELECT COUNT(*) as c FROM registrations WHERE tournament_id = ?'
     ).get(req.params.id).c;
     if (count >= tournament.max_participants)
-        return res.status(400).json({ error: 'Tournoi complet' });
+        return res.status(400).json({ error: 'Tournament is full' });
 
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
 
     if (tournament.mode === 'teams') {
         // Vérifie que l'utilisateur a une équipe
         if (!user.team_id)
-            return res.status(400).json({ error: 'Tu n\'as pas d\'équipe' });
+            return res.status(400).json({ error: 'You don\'t have a team' });
 
         // Vérifie que l'utilisateur est bien le manager de son équipe
         const team = db.prepare('SELECT * FROM teams WHERE id = ?').get(user.team_id);
         if (team.manager_id !== req.user.id)
-            return res.status(403).json({ error: 'Seul le manager peut inscrire l\'équipe' });
+            return res.status(403).json({ error: 'Only the team manager can register the team' });
 
         // Vérifie que l'équipe n'est pas déjà inscrite
         const existing = db.prepare(
             'SELECT * FROM registrations WHERE tournament_id = ? AND team_id = ?'
         ).get(req.params.id, user.team_id);
         if (existing)
-            return res.status(409).json({ error: 'Ton équipe est déjà inscrite' });
+            return res.status(409).json({ error: 'Your team is already registered' });
 
         db.prepare(
             'INSERT INTO registrations (tournament_id, team_id) VALUES (?, ?)'
@@ -104,7 +104,7 @@ router.post('/:id/register', auth, (req, res) => {
             'SELECT * FROM registrations WHERE tournament_id = ? AND user_id = ?'
         ).get(req.params.id, req.user.id);
         if (existing)
-            return res.status(409).json({ error: 'Tu es déjà inscrit' });
+            return res.status(409).json({ error: 'You\'re already registered' });
 
         db.prepare(
             'INSERT INTO registrations (tournament_id, user_id) VALUES (?, ?)'
@@ -116,11 +116,11 @@ router.post('/:id/register', auth, (req, res) => {
 // PATCH /api/tournaments/:id - modify a tournament (manager only)
 router.patch('/:id', auth, uploadSingle('logo'), async (req, res) => {
     const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(req.params.id);
-    if (!tournament) return res.status(404).json({ error: 'Tournoi introuvable' });
+    if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
     if (tournament.manager_id !== req.user.id)
-        return res.status(403).json({ error: 'Non autorisé' });
+        return res.status(403).json({ error: 'Unauthorized' });
     if (tournament.status !== 'open')
-        return res.status(400).json({ error: 'Impossible de modifier un tournoi déjà démarré' });
+        return res.status(400).json({ error: 'Cannot edit a tournament that has already started' });
 
     const { name, game, description, date, format, max_participants, mode } = req.body;
     if (name && name.length > 100)
@@ -160,9 +160,9 @@ router.patch('/:id', auth, uploadSingle('logo'), async (req, res) => {
 // DELETE /api/tournaments/:id - delete a tournament (manager only)
 router.delete('/:id', auth, (req, res) => {
     const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(req.params.id);
-    if (!tournament) return res.status(404).json({ error: 'Tournoi introuvable' });
+    if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
     if (tournament.manager_id !== req.user.id)
-        return res.status(403).json({ error: 'Non autorisé' });
+        return res.status(403).json({ error: 'Unauthorized' });
     if (tournament.status === 'ongoing')
         return res.status(400).json({ error: 'Cannot delete a tournament that is currently ongoing' });
 
@@ -179,17 +179,17 @@ router.delete('/:id/unregister', auth, (req, res) => {
     const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(req.params.id);
     if (!tournament) return res.status(404).json({ error: 'Unfound tournament' });
     if (tournament.status !== 'open')
-        return res.status(400).json({ error: 'Impossible de se désinscrire d\'un tournoi déjà démarré' });
+        return res.status(400).json({ error: 'Cannot unregister from a tournament that has already started' });
 
     if (tournament.mode === 'players') {
         db.prepare('DELETE FROM registrations WHERE tournament_id = ? AND user_id = ?')
             .run(req.params.id, req.user.id);
     } else {
         const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
-        if (!user.team_id) return res.status(400).json({ error: 'Tu n\'as pas d\'équipe' });
+        if (!user.team_id) return res.status(400).json({ error: 'You don\'t have a team' });
         const team = db.prepare('SELECT * FROM teams WHERE id = ?').get(user.team_id);
         if (team.manager_id !== req.user.id)
-            return res.status(403).json({ error: 'Seul le manager peut désinscrire l\'équipe' });
+            return res.status(403).json({ error: 'Only the team manager can unregister the team' });
         db.prepare('DELETE FROM registrations WHERE tournament_id = ? AND team_id = ?')
             .run(req.params.id, user.team_id);
     }
@@ -207,7 +207,7 @@ const {
 // GET /api/tournaments/:id/bracket — récupère le bracket
 router.get('/:id/bracket', (req, res) => {
     const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(req.params.id);
-    if (!tournament) return res.status(404).json({ error: 'Tournoi introuvable' });
+    if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
 
     const matches = db.prepare(`
     SELECT * FROM matches WHERE tournament_id = ? ORDER BY round, position
@@ -219,11 +219,11 @@ router.get('/:id/bracket', (req, res) => {
 // POST /api/tournaments/:id/bracket/generate — génère ou regénère le bracket
 router.post('/:id/bracket/generate', auth, (req, res) => {
     const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(req.params.id);
-    if (!tournament) return res.status(404).json({ error: 'Tournoi introuvable' });
+    if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
     if (tournament.manager_id !== req.user.id)
-        return res.status(403).json({ error: 'Non autorisé' });
+        return res.status(403).json({ error: 'Unauthorized' });
     if (tournament.status !== 'open')
-        return res.status(400).json({ error: 'Tournoi déjà démarré' });
+        return res.status(400).json({ error: 'Tournament already started' });
 
     const registrations = db.prepare(
         'SELECT * FROM registrations WHERE tournament_id = ?'
@@ -241,7 +241,7 @@ router.post('/:id/bracket/generate', auth, (req, res) => {
     } else if (tournament.format === 'double_elimination') {
         ({ matches } = generateDoubleElimination(participants, tournament.max_participants));
     } else {
-        return res.status(400).json({ error: 'Ce format ne nécessite pas de bracket pré-généré' });
+        return res.status(400).json({ error: 'This format does not require a pre-generated bracket' });
     }
 
     const insert = db.prepare(`
@@ -266,9 +266,9 @@ router.post('/:id/bracket/generate', auth, (req, res) => {
 // PATCH /api/tournaments/:id/bracket/swap — déplace un participant dans le bracket
 router.patch('/:id/bracket/swap', auth, (req, res) => {
     const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(req.params.id);
-    if (!tournament) return res.status(404).json({ error: 'Tournoi introuvable' });
+    if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
     if (tournament.manager_id !== req.user.id)
-        return res.status(403).json({ error: 'Non autorisé' });
+        return res.status(403).json({ error: 'Unauthorized' });
     if (tournament.status !== 'open')
         return res.status(400).json({ error: 'Cannot swap participants in a tournament that has already started' });
 
@@ -280,9 +280,9 @@ router.patch('/:id/bracket/swap', auth, (req, res) => {
     const matchB = db.prepare('SELECT * FROM matches WHERE id = ? AND tournament_id = ?')
         .get(targetMatchId, req.params.id);
 
-    if (!matchA || !matchB) return res.status(404).json({ error: 'Match introuvable' });
+    if (!matchA || !matchB) return res.status(404).json({ error: 'Match not found' });
     if (matchA.round !== 1 || matchB.round !== 1)
-        return res.status(400).json({ error: 'On ne peut déplacer que les participants du round 1' });
+        return res.status(400).json({ error: 'Only round 1 participants can be moved' });
 
     const valA = matchA[`participant_${slot}`];
     const valB = matchB[`participant_${targetSlot}`];
@@ -296,9 +296,9 @@ router.patch('/:id/bracket/swap', auth, (req, res) => {
 // DELETE /api/tournaments/:id/participants/:participantId — kick un participant
 router.delete('/:id/participants/:participantId', auth, (req, res) => {
     const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(req.params.id);
-    if (!tournament) return res.status(404).json({ error: 'Tournoi introuvable' });
+    if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
     if (tournament.manager_id !== req.user.id)
-        return res.status(403).json({ error: 'Non autorisé' });
+        return res.status(403).json({ error: 'Unauthorized' });
     if (tournament.status !== 'open')
         return res.status(400).json({ error: 'Cannot remove a participant from a tournament that has already started' });
 
@@ -732,15 +732,15 @@ function checkTournamentFinished(tournamentId, format) {
 // POST /api/tournaments/:id/start — démarre le tournoi
 router.post('/:id/start', auth, (req, res) => {
     const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(req.params.id);
-    if (!tournament) return res.status(404).json({ error: 'Tournoi introuvable' });
+    if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
     if (tournament.manager_id !== req.user.id)
-        return res.status(403).json({ error: 'Non autorisé' });
+        return res.status(403).json({ error: 'Unauthorized' });
     if (tournament.status !== 'open')
-        return res.status(400).json({ error: 'Tournoi déjà démarré' });
+        return res.status(400).json({ error: 'Tournament already started' });
 
     const participants = getParticipantIds(tournament);
     if (participants.length < 2)
-        return res.status(400).json({ error: 'Au moins 2 participants sont requis' });
+        return res.status(400).json({ error: 'At least 2 participants are required' });
 
     try {
         const tx = db.transaction(() => {
@@ -765,7 +765,7 @@ router.post('/:id/start', auth, (req, res) => {
                     'SELECT COUNT(*) AS c FROM matches WHERE tournament_id = ? AND round = 1'
                 ).get(tournament.id).c;
                 if (r1Count === 0) {
-                    throw new Error('Le bracket n\'a pas été généré');
+                    throw new Error('The bracket has not been generated');
                 }
                 // Propage les BYE (slots vides au round 1) vers les rounds suivants
                 propagateByes(tournament.id);
@@ -775,7 +775,7 @@ router.post('/:id/start', auth, (req, res) => {
                     'SELECT COUNT(*) AS c FROM matches WHERE tournament_id = ?'
                 ).get(tournament.id).c;
                 if (count === 0) {
-                    throw new Error('Le bracket n\'a pas été généré');
+                    throw new Error('The bracket has not been generated');
                 }
                 propagateByesDouble(tournament.id, tournament.max_participants);
             }
@@ -786,33 +786,33 @@ router.post('/:id/start', auth, (req, res) => {
         res.json({ success: true });
     } catch (err) {
         console.error('Start tournament failed:', err);
-        res.status(400).json({ error: err.message || 'Erreur au démarrage du tournoi' });
+        res.status(400).json({ error: err.message || 'Error starting the tournament' });
     }
 });
 
 // PUT /api/tournaments/:id/matches/:matchId — saisie/modification du score
 router.put('/:id/matches/:matchId', auth, (req, res) => {
     const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(req.params.id);
-    if (!tournament) return res.status(404).json({ error: 'Tournoi introuvable' });
+    if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
     if (tournament.manager_id !== req.user.id)
-        return res.status(403).json({ error: 'Non autorisé' });
+        return res.status(403).json({ error: 'Unauthorized' });
     if (tournament.status !== 'ongoing')
-        return res.status(400).json({ error: 'Le tournoi n\'est pas en cours' });
+        return res.status(400).json({ error: 'Tournament is not ongoing' });
 
     const match = db.prepare(
         'SELECT * FROM matches WHERE id = ? AND tournament_id = ?'
     ).get(req.params.matchId, req.params.id);
-    if (!match) return res.status(404).json({ error: 'Match introuvable' });
+    if (!match) return res.status(404).json({ error: 'Match not found' });
     if (match.participant_a == null || match.participant_b == null)
-        return res.status(400).json({ error: 'Match incomplet : un participant est manquant' });
+        return res.status(400).json({ error: 'Incomplete match: a participant is missing' });
 
     const { score_a, score_b } = req.body;
     const sa = Number(score_a);
     const sb = Number(score_b);
     if (!Number.isInteger(sa) || !Number.isInteger(sb) || sa < 0 || sb < 0)
-        return res.status(400).json({ error: 'Scores invalides' });
+        return res.status(400).json({ error: 'Invalid scores' });
     if (sa === sb)
-        return res.status(400).json({ error: 'Un match ne peut pas se terminer sur une égalité' });
+        return res.status(400).json({ error: 'A match cannot end in a draw' });
 
     const winner = sa > sb ? match.participant_a : match.participant_b;
     const loser  = sa > sb ? match.participant_b : match.participant_a;
@@ -828,12 +828,12 @@ router.put('/:id/matches/:matchId', auth, (req, res) => {
                 const downstreamPlayed = hasDownstreamPlayed(tournament.id, match);
                 if (downstreamPlayed) {
                     return res.status(409).json({
-                        error: 'Impossible de changer le gagnant : des matchs en aval ont déjà été joués'
+                        error: 'Cannot change the winner: downstream matches have already been played'
                     });
                 }
             } else {
                 return res.status(409).json({
-                    error: 'En double élim, modifier le gagnant n\'est pas autorisé'
+                    error: 'Cannot change the winner in double elimination'
                 });
             }
         }
@@ -854,7 +854,7 @@ router.put('/:id/matches/:matchId', auth, (req, res) => {
                 advanceSingleElim(tournament.id, match, winner);
             } else if (tournament.format === 'double_elimination') {
                 if (isRealFinished && match.winner !== winner) {
-                    throw new Error('Modification du gagnant non supportée en double élim');
+                    throw new Error('Winner change not supported in double elimination');
                 }
                 advanceDoubleElim(tournament.id, match, winner, loser, tournament.max_participants);
             }
@@ -864,16 +864,16 @@ router.put('/:id/matches/:matchId', auth, (req, res) => {
         res.json({ success: true });
     } catch (err) {
         console.error('Set match score failed:', err);
-        res.status(500).json({ error: 'Erreur à l\'enregistrement du score' });
+        res.status(500).json({ error: 'Error saving the score' });
     }
 });
 
 // GET /api/tournaments/:id/standings — classement round-robin
 router.get('/:id/standings', (req, res) => {
     const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(req.params.id);
-    if (!tournament) return res.status(404).json({ error: 'Tournoi introuvable' });
+    if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
     if (tournament.format !== 'round_robin')
-        return res.status(400).json({ error: 'Classement disponible uniquement en round robin' });
+        return res.status(400).json({ error: 'Standings are only available in round robin format' });
 
     const participants = getParticipantIds(tournament);
     const matches = db.prepare(
@@ -886,11 +886,11 @@ router.get('/:id/standings', (req, res) => {
 // POST /api/tournaments/:id/finish — clôture manuelle du tournoi
 router.post('/:id/finish', auth, (req, res) => {
     const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(req.params.id);
-    if (!tournament) return res.status(404).json({ error: 'Tournoi introuvable' });
+    if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
     if (tournament.manager_id !== req.user.id)
-        return res.status(403).json({ error: 'Non autorisé' });
+        return res.status(403).json({ error: 'Unauthorized' });
     if (tournament.status !== 'ongoing')
-        return res.status(400).json({ error: 'Le tournoi n\'est pas en cours' });
+        return res.status(400).json({ error: 'Tournament is not ongoing' });
 
     db.prepare(`UPDATE tournaments SET status = 'finished' WHERE id = ?`).run(tournament.id);
     res.json({ success: true });

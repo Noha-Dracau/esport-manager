@@ -16,7 +16,7 @@ router.get('/', (req, res) => {
 // GET /api/teams/:id
 router.get('/:id', (req, res) => {
     const team = db.prepare('SELECT * FROM teams WHERE id = ?').get(req.params.id);
-    if (!team) return res.status(404).json({ error: 'Équipe introuvable' });
+    if (!team) return res.status(404).json({ error: 'Team not found' });
 
     const members = db.prepare(
         'SELECT id, username, avatar_url FROM users WHERE team_id = ?'
