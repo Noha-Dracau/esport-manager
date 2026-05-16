@@ -79,6 +79,16 @@ export default function TournamentDetailPage() {
         }
     }
 
+    async function handleKick(participantId) {
+        if (!confirm('Remove this participant from the tournament?')) return;
+        try {
+            await api.delete(`/tournaments/${id}/participants/${participantId}`);
+            fetchTournament();
+        } catch (err) {
+            setError(err.response?.data?.error || 'Error');
+        }
+    }
+
     async function handleDelete() {
         if (!confirm('Definitively delete this tournament?')) return;
         try {
@@ -279,7 +289,7 @@ export default function TournamentDetailPage() {
                                             background: '#2a2a4a', display: 'flex', alignItems: 'center', justifyContent: 'center'
                                         }}>{r.username?.[0]?.toUpperCase()}</div>
                                     )}
-                                    <span>{r.username}</span>
+                                    <span style={{ flex: 1 }}>{r.username}</span>
                                 </>
                             ) : (
                                 <>
@@ -292,8 +302,18 @@ export default function TournamentDetailPage() {
                                             background: '#1d9e75', display: 'flex', alignItems: 'center', justifyContent: 'center'
                                         }}>{r.team_name?.[0]?.toUpperCase()}</div>
                                     )}
-                                    <span>{r.team_name}</span>
+                                    <span style={{ flex: 1 }}>{r.team_name}</span>
                                 </>
+                            )}
+                            {isManager && tournament.status === 'open' && (
+                                <button
+                                    onClick={() => handleKick(tournament.mode === 'players' ? r.user_id : r.team_id)}
+                                    style={{
+                                        padding: '0.1rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem',
+                                        border: '1px solid #e74c3c', background: 'transparent',
+                                        color: '#e74c3c', cursor: 'pointer', flexShrink: 0
+                                    }}
+                                >✕</button>
                             )}
                         </div>
                     ))}
