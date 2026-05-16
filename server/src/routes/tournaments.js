@@ -17,6 +17,12 @@ router.get('/', (req, res) => {
     res.json(db.prepare(query).all(...params));
 });
 
+// GET /api/tournaments/games - distinct games present in the DB
+router.get('/games', (req, res) => {
+    const rows = db.prepare('SELECT DISTINCT game FROM tournaments ORDER BY game ASC').all();
+    res.json(rows.map(r => r.game));
+});
+
 // GET /api/tournaments/:id - details + participants
 router.get('/:id', (req, res) => {
     const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(req.params.id);

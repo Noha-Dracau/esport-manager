@@ -6,8 +6,13 @@ export default function TournamentsPage() {
     const [tournaments, setTournaments] = useState([]);
     const [search, setSearch]           = useState('');
     const [game, setGame]               = useState('');
+    const [mode, setMode]               = useState('');
+    const [games, setGames]             = useState([]);
     const navigate = useNavigate();
-    const [mode, setMode] = useState('');
+
+    useEffect(() => {
+        api.get('/tournaments/games').then(r => setGames(r.data));
+    }, []);
 
     useEffect(() => {
         api.get('/tournaments', { params: { search, game, mode } })
@@ -28,14 +33,7 @@ export default function TournamentsPage() {
                 />
                 <select value={game} onChange={e => setGame(e.target.value)} style={{ ...inputStyle, flex: 1, minWidth: '150px' }}>
                     <option value="">All games</option>
-                    <option value="League of Legends">League of Legends</option>
-                    <option value="Valorant">Valorant</option>
-                    <option value="CS2">CS2</option>
-                    <option value="Fortnite">Fortnite</option>
-                    <option value="Rocket League">Rocket League</option>
-                    <option value="Overwatch 2">Overwatch 2</option>
-                    <option value="FIFA">FIFA</option>
-                    <option value="Street Fighter 6">Street Fighter 6</option>
+                    {games.map(g => <option key={g} value={g}>{g}</option>)}
                 </select>
                 <select value={mode} onChange={e => setMode(e.target.value)} style={{ ...inputStyle, flex: 1, minWidth: '150px' }}>
                     <option value="">Any</option>
