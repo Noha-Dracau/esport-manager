@@ -55,7 +55,7 @@ export default function CreateTournamentPage() {
                 {/* Title */}
                 <div>
                     <label style={labelStyle}>Title *</label>
-                    <input name="name" value={form.name} onChange={handleChange} placeholder="Name of the tournament..." style={inputStyle} />
+                    <input name="name" value={form.name} onChange={handleChange} placeholder="Name of the tournament..." maxLength={100} style={inputStyle} />
                 </div>
 
                 {/* Game */}
@@ -83,6 +83,7 @@ export default function CreateTournamentPage() {
                         onChange={handleChange}
                         placeholder="Describe your tournament..."
                         rows={3}
+                        maxLength={500}
                         style={{ ...inputStyle, resize: 'vertical' }}
                     />
                 </div>

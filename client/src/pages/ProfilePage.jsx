@@ -92,6 +92,7 @@ export default function ProfilePage() {
                 <input
                     value={username}
                     onChange={e => setUsername(e.target.value)}
+                    maxLength={30}
                     style={inputStyle}
                 />
 

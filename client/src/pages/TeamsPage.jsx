@@ -63,6 +63,7 @@ export default function TeamsPage() {
                         placeholder="Team name"
                         value={teamName}
                         onChange={e => setTeamName(e.target.value)}
+                        maxLength={50}
                         style={inputStyle}
                     />
                     <div style={{ marginBottom: '1rem' }}>

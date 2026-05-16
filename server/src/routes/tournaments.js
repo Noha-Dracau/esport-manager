@@ -43,6 +43,12 @@ router.get('/:id', (req, res) => {
 // POST /api/tournaments - create a tournament (auth required)
 router.post('/', auth, upload.single('logo'), (req, res) => {
     const { name, game, description, date, format, max_participants, mode } = req.body;
+    if (name && name.length > 100)
+        return res.status(400).json({ error: "Field 'name' must not exceed 100 characters" });
+    if (description && description.length > 500)
+        return res.status(400).json({ error: "Field 'description' must not exceed 500 characters" });
+    if (game && game.length > 50)
+        return res.status(400).json({ error: "Field 'game' must not exceed 50 characters" });
     const logo_url = req.file ? `/uploads/${req.file.filename}` : null;
 
     const result = db.prepare(`
@@ -113,6 +119,12 @@ router.patch('/:id', auth, upload.single('logo'), (req, res) => {
         return res.status(400).json({ error: 'Impossible de modifier un tournoi déjà démarré' });
 
     const { name, game, description, date, format, max_participants, mode } = req.body;
+    if (name && name.length > 100)
+        return res.status(400).json({ error: "Field 'name' must not exceed 100 characters" });
+    if (description && description.length > 500)
+        return res.status(400).json({ error: "Field 'description' must not exceed 500 characters" });
+    if (game && game.length > 50)
+        return res.status(400).json({ error: "Field 'game' must not exceed 50 characters" });
     const logo_url = req.file ? `/uploads/${req.file.filename}` : tournament.logo_url;
 
     db.prepare(`

@@ -109,6 +109,7 @@ export default function TournamentDetailPage() {
                         <input
                             value={form.name}
                             onChange={e => setForm({ ...form, name: e.target.value })}
+                            maxLength={100}
                             style={inputStyle}
                         />
                     ) : (
@@ -180,7 +181,7 @@ export default function TournamentDetailPage() {
                     </div>
                     <div>
                         <label style={labelStyle}>Description</label>
-                        <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={3} style={{ ...inputStyle, resize: 'vertical' }} />
+                        <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={3} maxLength={500} style={{ ...inputStyle, resize: 'vertical' }} />
                     </div>
                     <div>
                         <label style={labelStyle}>Date</label>

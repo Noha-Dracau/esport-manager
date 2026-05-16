@@ -60,6 +60,9 @@ router.get('/:id', (req, res) => {
 // PATCH /api/users/me - change profile
 router.patch('/me', auth, upload.single('avatar'), (req, res) => {
   const { username } = req.body;
+  if (username && username.length > 30)
+    return res.status(400).json({ error: "Field 'username' must not exceed 30 characters" });
+
   const avatar_url = req.file ? `/uploads/${req.file.filename}` : undefined;
 
   const fields = [];

@@ -46,6 +46,8 @@ router.get('/:id', (req, res) => {
 // POST /api/teams - create a team
 router.post('/', auth, upload.single('logo'), (req, res) => {
     const { name } = req.body;
+    if (name && name.length > 50)
+        return res.status(400).json({ error: "Field 'name' must not exceed 50 characters" });
     const logo_url = req.file ? `/uploads/${req.file.filename}` : null;
 
     // Asserts the user is not in a team

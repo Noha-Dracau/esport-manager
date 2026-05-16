@@ -47,6 +47,7 @@ export default function LoginPage() {
                     placeholder="Username"
                     value={username}
                     onChange={e => setUsername(e.target.value)}
+                    maxLength={30}
                     style={inputStyle}
                 />
             )}
@@ -56,6 +57,7 @@ export default function LoginPage() {
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
+                maxLength={100}
                 style={inputStyle}
             />
 

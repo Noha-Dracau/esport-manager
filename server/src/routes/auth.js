@@ -8,6 +8,10 @@ router.post('/register', (req, res) => {
     const { email, password, username } = req.body;
     if (!email || !password || !username)
         return res.status(400).json({ error: 'Missing fields!' });
+    if (username.length > 30)
+        return res.status(400).json({ error: "Field 'username' must not exceed 30 characters" });
+    if (email.length > 100)
+        return res.status(400).json({ error: "Field 'email' must not exceed 100 characters" });
 
     const hash = bcrypt.hashSync(password, 10);
     try {
