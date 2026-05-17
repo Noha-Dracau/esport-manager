@@ -22,8 +22,8 @@ export default function CreateTournamentPage() {
 
     function handleChange(e) {
         const updated = { ...form, [e.target.name]: e.target.value };
-        if (e.target.name === 'format' && e.target.value === 'round_robin' && Number(updated.max_participants) > 8)
-            updated.max_participants = 8;
+        if (e.target.name === 'format' && e.target.value === 'round_robin' && Number(updated.max_participants) > 16)
+            updated.max_participants = 16;
         setForm(updated);
     }
 
@@ -122,7 +122,7 @@ export default function CreateTournamentPage() {
                         name="max_participants"
                         type="range"
                         min="4"
-                        max={form.format === 'round_robin' ? 8 : 64}
+                        max={form.format === 'round_robin' ? 16 : 64}
                         step="4"
                         value={form.max_participants}
                         onChange={handleChange}
@@ -130,10 +130,15 @@ export default function CreateTournamentPage() {
                     />
                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#888', fontSize: '0.8rem' }}>
                         {form.format === 'round_robin'
-                            ? <><span>4</span><span>8</span></>
+                            ? <><span>4</span><span>8</span><span>12</span><span>16</span></>
                             : <><span>4</span><span>16</span><span>32</span><span>64</span></>
                         }
                     </div>
+                    {form.format === 'round_robin' && (
+                        <p style={{ margin: '0.3rem 0 0', color: '#a1a1a1', fontSize: '0.8rem' }}>
+                            {form.max_participants} participants will generate {Number(form.max_participants) * (Number(form.max_participants) - 1) / 2} matches
+                        </p>
+                    )}
                 </div>
 
                 {/* Mode */}

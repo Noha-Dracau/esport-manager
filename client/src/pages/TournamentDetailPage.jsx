@@ -228,7 +228,7 @@ export default function TournamentDetailPage() {
                         <label style={labelStyle}>Format</label>
                         <select value={form.format} onChange={e => {
                             const newFormat = e.target.value;
-                            const clampedMax = newFormat === 'round_robin' && Number(form.max_participants) > 8 ? 8 : form.max_participants;
+                            const clampedMax = newFormat === 'round_robin' && Number(form.max_participants) > 16 ? 16 : form.max_participants;
                             setForm({ ...form, format: newFormat, max_participants: clampedMax });
                         }} style={inputStyle}>
                             <option value="single_elimination">Single elimination</option>
@@ -238,9 +238,14 @@ export default function TournamentDetailPage() {
                     </div>
                     <div>
                         <label style={labelStyle}>Max participants: {form.max_participants}</label>
-                        <input type="range" min="4" max={form.format === 'round_robin' ? 8 : 64} step="4" value={form.max_participants}
+                        <input type="range" min="4" max={form.format === 'round_robin' ? 16 : 64} step="4" value={form.max_participants}
                                onChange={e => setForm({ ...form, max_participants: e.target.value })}
                                style={{ width: '100%', accentColor: '#FCA616' }} />
+                        {form.format === 'round_robin' && (
+                            <p style={{ margin: '0.3rem 0 0', color: '#a1a1a1', fontSize: '0.8rem' }}>
+                                {form.max_participants} participants will generate {Number(form.max_participants) * (Number(form.max_participants) - 1) / 2} matches
+                            </p>
+                        )}
                     </div>
                     <div>
                         <label style={labelStyle}>New logo</label>
