@@ -1,4 +1,4 @@
-# E-Sport Tournament Manager
+# [LOCK IN!] E-Sport Tournament Manager
 
 A web application for organizing and managing esports tournaments. Create tournaments, manage teams, generate brackets, and track results in real time.
 
