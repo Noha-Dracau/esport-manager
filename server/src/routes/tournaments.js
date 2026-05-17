@@ -335,9 +335,6 @@ router.delete('/:id/participants/:participantId', auth, (req, res) => {
     res.json({ success: true });
 });
 
-// server/src/routes/tournaments.js
-// (additions — garde tout ce qui existe déjà)
-
 const { generateRoundRobin, computeStandings } = require('../utils/roundRobinGenerator');
 
 // =================================================================

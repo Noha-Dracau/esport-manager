@@ -37,10 +37,10 @@ export default function App() {
                 <Route path="/create-tournament" element={
                   <ProtectedRoute><CreateTournamentPage /></ProtectedRoute>
                 } />
-                <Route path="*" element={<Navigate to="/" />} />
                 <Route path="/tournaments/:id/manage" element={
                   <ProtectedRoute><ManageTournamentPage /></ProtectedRoute>
                 } />
+                <Route path="*" element={<Navigate to="/" />} />
               </Routes>
             </main>
           </div>
