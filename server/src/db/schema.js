@@ -83,6 +83,32 @@ function runMigrations() {
     try { db.exec("ALTER TABLE matches ADD COLUMN score_b INTEGER"); } catch (e) {}
     try { db.exec("ALTER TABLE users ADD COLUMN discord_username TEXT"); } catch (e) {}
     try { db.exec("ALTER TABLE teams ADD COLUMN bio TEXT"); } catch (e) {}
+
+    // Drop UNIQUE on teams.name (was in CREATE TABLE), add deleted_at, create partial unique index.
+    // Guard: skip if the partial index already exists (migration already applied).
+    try {
+        const indexed = db.prepare("SELECT 1 FROM sqlite_master WHERE type='index' AND name='teams_name_active'").get();
+        if (!indexed) {
+            db.pragma('foreign_keys = OFF');
+            db.exec(`CREATE TABLE teams_migrated (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                name       TEXT NOT NULL,
+                logo_url   TEXT,
+                manager_id INTEGER NOT NULL REFERENCES users(id),
+                created_at TEXT DEFAULT (datetime('now')),
+                bio        TEXT,
+                deleted_at TEXT
+            )`);
+            db.exec('INSERT INTO teams_migrated SELECT id, name, logo_url, manager_id, created_at, bio, NULL FROM teams');
+            db.exec('DROP TABLE teams');
+            db.exec('ALTER TABLE teams_migrated RENAME TO teams');
+            db.exec("CREATE UNIQUE INDEX teams_name_active ON teams(name) WHERE deleted_at IS NULL");
+            db.pragma('foreign_keys = ON');
+        }
+    } catch (e) {
+        db.pragma('foreign_keys = ON');
+        console.error('Migration teams_name_active failed:', e);
+    }
 }
 
 module.exports = { initSchema };

@@ -91,7 +91,7 @@ export default function TeamDetailPage() {
     }
 
     async function handleDelete() {
-        if (!confirm('Delete the team (no going back)?')) return;
+        if (!confirm('Disband the team? This cannot be undone.')) return;
         try {
             await api.delete(`/teams/${id}`);
             await refreshUser();
@@ -101,9 +101,10 @@ export default function TeamDetailPage() {
 
     if (!team) return <p>Loading...</p>;
 
-    const isManager  = Number(user?.userId) === team.manager_id;
-    const isMember   = team.members?.some(m => m.id === Number(user?.userId));
-    const hasPending = team.pendingInvitations?.some(i => i.user_id === Number(user?.userId));
+    const isManager   = Number(user?.userId) === team.manager_id;
+    const isMember    = team.members?.some(m => m.id === Number(user?.userId));
+    const hasPending  = team.pendingInvitations?.some(i => i.user_id === Number(user?.userId));
+    const isDisbanded = !!team.deleted_at;
 
     return (
         <div style={{ maxWidth: '700px', margin: '0 auto' }}>
@@ -154,16 +155,27 @@ export default function TeamDetailPage() {
                     ) : (
                         <>
                             <h1 style={{ margin: '0 0 0.3rem' }}>{team.name}</h1>
+                            {isDisbanded && (
+                                <span style={{
+                                    display: 'inline-block', margin: '0.2rem 0 0.3rem',
+                                    background: '#e74c3c22', color: '#e74c3c',
+                                    padding: '2px 10px', borderRadius: '4px', fontSize: '0.8rem'
+                                }}>
+                                    Disbanded · {new Date(team.deleted_at).toLocaleDateString('fr-FR')}
+                                </span>
+                            )}
                             <BioText bio={team.bio} />
-                            <p style={{ color: '#EAEAEA', margin: '0.3rem 0 0' }}>
-                                {isManager ? 'You are the manager' : isMember ? 'You are a member' : ''}
-                            </p>
+                            {!isDisbanded && (
+                                <p style={{ color: '#EAEAEA', margin: '0.3rem 0 0' }}>
+                                    {isManager ? 'You are the manager' : isMember ? 'You are a member' : ''}
+                                </p>
+                            )}
                         </>
                     )}
                 </div>
 
                 {/* Manager buttons */}
-                {isManager && (
+                {isManager && !isDisbanded && (
                     <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
                         {editing ? (
                             <>
@@ -194,7 +206,7 @@ export default function TeamDetailPage() {
             {success && <p style={{ color: '#22c55e' }}>{success}</p>}
 
             {/* Join button */}
-            {!isManager && !isMember && user && (
+            {!isManager && !isMember && user && !isDisbanded && (
                 <div style={{ marginBottom: '1.5rem' }}>
                     {hasPending ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>

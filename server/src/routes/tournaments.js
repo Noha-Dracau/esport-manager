@@ -88,6 +88,8 @@ router.post('/:id/register', auth, (req, res) => {
             return res.status(400).json({ error: 'You don\'t have a team' });
 
         const team = db.prepare('SELECT * FROM teams WHERE id = ?').get(user.team_id);
+        if (team.deleted_at)
+            return res.status(400).json({ error: 'Your team has been disbanded' });
         if (team.manager_id !== req.user.id)
             return res.status(403).json({ error: 'Only the team manager can register the team' });
 

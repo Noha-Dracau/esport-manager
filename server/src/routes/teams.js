@@ -7,8 +7,8 @@ const { uploadSingle, saveImage, deleteUpload } = require('../middleware/upload'
 router.get('/', (req, res) => {
     const { search } = req.query;
     const query = search
-        ? 'SELECT * FROM teams WHERE name LIKE ? ORDER BY name COLLATE NOCASE ASC'
-        : 'SELECT * FROM teams ORDER BY name COLLATE NOCASE ASC';
+        ? 'SELECT * FROM teams WHERE deleted_at IS NULL AND name LIKE ? ORDER BY name COLLATE NOCASE ASC'
+        : 'SELECT * FROM teams WHERE deleted_at IS NULL ORDER BY name COLLATE NOCASE ASC';
     const params = search ? [`%${search}%`] : [];
     res.json(db.prepare(query).all(...params));
 });
@@ -42,10 +42,12 @@ router.post('/', auth, uploadSingle('logo'), async (req, res) => {
         return res.status(400).json({ error: "Field 'name' must not exceed 50 characters" });
     const logo_url = req.file ? await saveImage(req.file.buffer) : null;
 
-    // Asserts the user is not in a team
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
     if (user.team_id)
         return res.status(400).json({ error: 'You already have a team!' });
+
+    const nameTaken = db.prepare('SELECT 1 FROM teams WHERE name = ? AND deleted_at IS NULL').get(name);
+    if (nameTaken) return res.status(409).json({ error: 'Team name already taken!' });
 
     try {
         const result = db.prepare(
@@ -69,10 +71,18 @@ router.patch('/:id', auth, uploadSingle('logo'), async (req, res) => {
     if (!team) return res.status(404).json({ error: 'Team not found' });
     if (team.manager_id !== req.user.id)
         return res.status(403).json({ error: 'Unauthorized' });
+    if (team.deleted_at)
+        return res.status(400).json({ error: 'Team has been disbanded' });
 
     const { name, bio } = req.body;
     if (name && name.length > 50)
         return res.status(400).json({ error: "Field 'name' must not exceed 50 characters" });
+    if (name && name !== team.name) {
+        const nameTaken = db.prepare(
+            'SELECT 1 FROM teams WHERE name = ? AND deleted_at IS NULL AND id != ?'
+        ).get(name, req.params.id);
+        if (nameTaken) return res.status(409).json({ error: 'Team name already taken!' });
+    }
 
     let bioValue = team.bio;
     if (bio !== undefined) {
@@ -91,19 +101,47 @@ router.patch('/:id', auth, uploadSingle('logo'), async (req, res) => {
     res.json({ success: true });
 });
 
-// DELETE /api/teams/:id - delete the team (manager only)
+// DELETE /api/teams/:id - disband the team (soft delete, manager only)
 router.delete('/:id', auth, (req, res) => {
     const team = db.prepare('SELECT * FROM teams WHERE id = ?').get(req.params.id);
-    if (!team) return res.status(404).json({ error: 'Unfound team' });
+    if (!team) return res.status(404).json({ error: 'Team not found' });
     if (team.manager_id !== req.user.id)
         return res.status(403).json({ error: 'Unauthorized' });
+    if (team.deleted_at)
+        return res.status(400).json({ error: 'Team is already disbanded' });
 
-    deleteUpload(team.logo_url);
-    db.prepare('UPDATE users SET team_id = NULL WHERE team_id = ?').run(req.params.id);
-    db.prepare('DELETE FROM invitations WHERE team_id = ?').run(req.params.id);
-    db.prepare('DELETE FROM teams WHERE id = ?').run(req.params.id);
+    try {
+        const disband = db.transaction(() => {
+            // Unregister from open tournaments and invalidate their brackets
+            const openRegs = db.prepare(`
+                SELECT r.tournament_id FROM registrations r
+                JOIN tournaments t ON t.id = r.tournament_id
+                WHERE r.team_id = ? AND t.status = 'open'
+            `).all(req.params.id);
+            for (const reg of openRegs) {
+                db.prepare('DELETE FROM registrations WHERE tournament_id = ? AND team_id = ?')
+                    .run(reg.tournament_id, req.params.id);
+                db.prepare('DELETE FROM matches WHERE tournament_id = ?')
+                    .run(reg.tournament_id);
+            }
 
-    res.json({ success: true });
+            // Disaffiliate all members (including manager)
+            db.prepare('UPDATE users SET team_id = NULL WHERE team_id = ?').run(req.params.id);
+
+            // Delete pending invitations
+            db.prepare('DELETE FROM invitations WHERE team_id = ?').run(req.params.id);
+
+            // Soft delete
+            db.prepare("UPDATE teams SET deleted_at = datetime('now') WHERE id = ?").run(req.params.id);
+        });
+
+        disband();
+        deleteUpload(team.logo_url);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Disband team failed:', err);
+        res.status(500).json({ error: 'Error disbanding the team' });
+    }
 });
 
 // POST /api/teams/:id/leave - leaves the team (members only)
