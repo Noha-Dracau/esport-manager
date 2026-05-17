@@ -11,18 +11,17 @@ router.get('/me', auth, (req, res) => {
   res.json(user);
 });
 
-// GET /api/users/me/tournaments — tournois auxquels l'utilisateur participe
+// GET /api/users/me/tournaments - tournaments the user participates in
 router.get('/me/tournaments', auth, (req, res) => {
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
 
-  // Tournois en tant que joueur
   const asPlayer = db.prepare(`
     SELECT t.* FROM tournaments t
     JOIN registrations r ON r.tournament_id = t.id
     WHERE r.user_id = ?
   `).all(req.user.id);
 
-  // Tournois en tant qu'équipe (si manager)
+  // as a team (only if the user manages one)
   let asTeam = [];
   if (user.team_id) {
     asTeam = db.prepare(`
@@ -32,7 +31,6 @@ router.get('/me/tournaments', auth, (req, res) => {
     `).all(user.team_id);
   }
 
-  // Tournois créés par l'utilisateur
   const asManager = db.prepare(
       'SELECT * FROM tournaments WHERE manager_id = ?'
   ).all(req.user.id);
@@ -40,7 +38,7 @@ router.get('/me/tournaments', auth, (req, res) => {
   res.json({ asPlayer, asTeam, asManager });
 });
 
-// GET /api/users/:id — profil public d'un utilisateur
+// GET /api/users/:id - public user profile
 router.get('/:id', (req, res) => {
   const user = db.prepare(
       'SELECT id, username, avatar_url, discord_username FROM users WHERE id = ?'

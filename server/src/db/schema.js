@@ -1,5 +1,9 @@
 const db = require('./database');
 
+/**
+ * Creates all database tables if they do not exist and runs pending migrations.
+ * Safe to call on every server start (idempotent).
+ */
 function initSchema() {
     db.exec(`
         CREATE TABLE IF NOT EXISTS users (
@@ -56,7 +60,7 @@ function initSchema() {
                                                tournament_id INTEGER NOT NULL REFERENCES tournaments(id),
             round         INTEGER NOT NULL,
             position      INTEGER NOT NULL,
-            participant_a INTEGER, -- user_id ou team_id selon le mode
+            participant_a INTEGER, -- user_id or team_id depending on tournament mode
             participant_b INTEGER,
             winner        INTEGER,
             status        TEXT DEFAULT 'pending'
@@ -68,6 +72,10 @@ function initSchema() {
     console.log('Database successfully initialized');
 }
 
+/**
+ * Applies additive schema changes that cannot be expressed in CREATE TABLE IF NOT EXISTS.
+ * Each statement is wrapped in try/catch so already-applied migrations are silently skipped.
+ */
 function runMigrations() {
     try { db.exec("ALTER TABLE matches ADD COLUMN bracket TEXT DEFAULT 'winners'"); } catch (e) {}
     try { db.exec("ALTER TABLE matches ADD COLUMN loser INTEGER"); } catch (e) {}

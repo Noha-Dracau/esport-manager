@@ -99,11 +99,8 @@ router.delete('/:id', auth, (req, res) => {
         return res.status(403).json({ error: 'Unauthorized' });
 
     deleteUpload(team.logo_url);
-    // Removes the team for everyone
     db.prepare('UPDATE users SET team_id = NULL WHERE team_id = ?').run(req.params.id);
-    // Removes linked invitations
     db.prepare('DELETE FROM invitations WHERE team_id = ?').run(req.params.id);
-    // Deletes the team
     db.prepare('DELETE FROM teams WHERE id = ?').run(req.params.id);
 
     res.json({ success: true });

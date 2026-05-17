@@ -3,7 +3,7 @@ const db     = require('../db/database');
 const auth   = require('../middleware/auth');
 const { uploadSingle, saveImage, deleteUpload } = require('../middleware/upload');
 
-// GET /api/tournaments - list with filter/research
+// GET /api/tournaments - list with optional filters
 router.get('/', (req, res) => {
     const { search, game, mode, status } = req.query;
     let query = 'SELECT * FROM tournaments WHERE 1=1';
@@ -63,6 +63,7 @@ router.post('/', auth, uploadSingle('logo'), async (req, res) => {
     res.status(201).json({ id: result.lastInsertRowid });
 });
 
+// POST /api/tournaments/:id/register - register for a tournament
 router.post('/:id/register', auth, (req, res) => {
     const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(req.params.id);
     if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
@@ -78,16 +79,13 @@ router.post('/:id/register', auth, (req, res) => {
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
 
     if (tournament.mode === 'teams') {
-        // Vérifie que l'utilisateur a une équipe
         if (!user.team_id)
             return res.status(400).json({ error: 'You don\'t have a team' });
 
-        // Vérifie que l'utilisateur est bien le manager de son équipe
         const team = db.prepare('SELECT * FROM teams WHERE id = ?').get(user.team_id);
         if (team.manager_id !== req.user.id)
             return res.status(403).json({ error: 'Only the team manager can register the team' });
 
-        // Vérifie que l'équipe n'est pas déjà inscrite
         const existing = db.prepare(
             'SELECT * FROM registrations WHERE tournament_id = ? AND team_id = ?'
         ).get(req.params.id, user.team_id);
@@ -99,7 +97,7 @@ router.post('/:id/register', auth, (req, res) => {
         ).run(req.params.id, user.team_id);
 
     } else {
-        // Mode joueurs — vérifie que le joueur n'est pas déjà inscrit
+        // player mode
         const existing = db.prepare(
             'SELECT * FROM registrations WHERE tournament_id = ? AND user_id = ?'
         ).get(req.params.id, req.user.id);
@@ -111,7 +109,7 @@ router.post('/:id/register', auth, (req, res) => {
         ).run(req.params.id, req.user.id);
     }
 
-    // Invalide le bracket : il ne reflète plus la liste des inscrits
+    // clear the bracket — participant list changed
     db.prepare('DELETE FROM matches WHERE tournament_id = ?').run(req.params.id);
 
     res.json({ success: true });
@@ -197,7 +195,7 @@ router.delete('/:id/unregister', auth, (req, res) => {
             .run(req.params.id, user.team_id);
     }
 
-    // Invalide le bracket : il ne reflète plus la liste des inscrits
+    // clear the bracket — participant list changed
     db.prepare('DELETE FROM matches WHERE tournament_id = ?').run(req.params.id);
 
     res.json({ success: true });
@@ -210,7 +208,7 @@ const {
     getLoserBracketNext
 } = require('../utils/bracketGenerator');
 
-// GET /api/tournaments/:id/bracket — récupère le bracket
+// GET /api/tournaments/:id/bracket - return the bracket
 router.get('/:id/bracket', (req, res) => {
     const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(req.params.id);
     if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
@@ -222,7 +220,7 @@ router.get('/:id/bracket', (req, res) => {
     res.json({ matches, format: tournament.format, mode: tournament.mode });
 });
 
-// POST /api/tournaments/:id/bracket/generate — génère ou regénère le bracket
+// POST /api/tournaments/:id/bracket/generate - generate or regenerate the bracket
 router.post('/:id/bracket/generate', auth, (req, res) => {
     const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(req.params.id);
     if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
@@ -269,7 +267,7 @@ router.post('/:id/bracket/generate', auth, (req, res) => {
     res.json({ success: true });
 });
 
-// PATCH /api/tournaments/:id/bracket/swap — déplace un participant dans le bracket
+// PATCH /api/tournaments/:id/bracket/swap - swap two participants in the bracket
 router.patch('/:id/bracket/swap', auth, (req, res) => {
     const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(req.params.id);
     if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
@@ -301,7 +299,7 @@ router.patch('/:id/bracket/swap', auth, (req, res) => {
     res.json({ success: true });
 });
 
-// DELETE /api/tournaments/:id/participants/:participantId — kick un participant
+// DELETE /api/tournaments/:id/participants/:participantId - remove a participant (manager only)
 router.delete('/:id/participants/:participantId', auth, (req, res) => {
     const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(req.params.id);
     if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
@@ -312,7 +310,6 @@ router.delete('/:id/participants/:participantId', auth, (req, res) => {
 
     const pid = Number(req.params.participantId);
 
-    // Supprime la registration
     if (tournament.mode === 'players') {
         db.prepare('DELETE FROM registrations WHERE tournament_id = ? AND user_id = ?')
             .run(req.params.id, pid);
@@ -321,7 +318,7 @@ router.delete('/:id/participants/:participantId', auth, (req, res) => {
             .run(req.params.id, pid);
     }
 
-    // Retire du bracket (round 1 uniquement)
+    // clear the participant from the bracket (round 1 only)
     const matchA = db.prepare(
         'SELECT * FROM matches WHERE tournament_id = ? AND round = 1 AND participant_a = ?'
     ).get(req.params.id, pid);
@@ -342,7 +339,10 @@ const { generateRoundRobin, computeStandings } = require('../utils/roundRobinGen
 // =================================================================
 
 /**
- * Renvoie les IDs des participants d'un tournoi (user_id ou team_id selon le mode).
+ * Returns the participant IDs for a tournament (user_id or team_id depending on mode).
+ *
+ * @param {{ id: number, mode: string }} tournament
+ * @returns {Array<number>}
  */
 function getParticipantIds(tournament) {
     const rows = db.prepare(
@@ -354,9 +354,13 @@ function getParticipantIds(tournament) {
 }
 
 /**
- * Avancement single elimination :
- * round R, position P → round R+1, position ceil(P/2).
- * Slot 'a' si P impair, slot 'b' si P pair (positions 1-indexées, alignées sur le générateur).
+ * Advances a single-elimination winner to the next round.
+ * Round R, position P → round R+1, position ceil(P/2).
+ * Slot 'a' if P is odd, 'b' if P is even (1-indexed, aligned with the generator).
+ *
+ * @param {number} tournamentId
+ * @param {{ round: number, position: number }} match
+ * @param {number} winnerId
  */
 function advanceSingleElim(tournamentId, match, winnerId) {
     const nextRound = match.round + 1;
@@ -368,31 +372,36 @@ function advanceSingleElim(tournamentId, match, winnerId) {
         WHERE tournament_id = ? AND round = ? AND position = ?
     `).get(tournamentId, nextRound, nextPosition);
 
-    if (!next) return; // finale
+    if (!next) return; // final match
 
     db.prepare(`UPDATE matches SET participant_${slot} = ? WHERE id = ?`)
         .run(winnerId, next.id);
 
-    // Le slot rempli peut compléter une BYE en aval (cas max_participants > inscrits)
+    // filling this slot may resolve a downstream BYE when max_participants > actual registrants
     propagateByes(tournamentId);
 }
 
 /**
- * Avancement double élim.
- * Selon le bracket du match terminé, fait avancer gagnant et perdant.
+ * Advances both winner and loser of a double-elimination match.
+ * Routes depend on the match bracket ('winners', 'losers', or 'grand_final').
+ *
+ * @param {number} tournamentId
+ * @param {{ bracket: string, round: number, position: number }} match
+ * @param {number} winner
+ * @param {number} loser
+ * @param {number} maxParticipants
  */
 function advanceDoubleElim(tournamentId, match, winner, loser, maxParticipants) {
-    // On a besoin de la taille, recalcule simplement :
     let size = 1;
     while (size < maxParticipants) size *= 2;
     const wbRounds = Math.log2(size);
     const lbRounds = 2 * (wbRounds - 1);
 
     if (match.bracket === 'winners') {
-        // 1. Gagnant : monte dans WB
+        // 1. Winner: advance in WB
         const nextWbRound = match.round + 1;
         if (nextWbRound > wbRounds) {
-            // C'était la finale WB → gagnant va en grand_final slot a
+            // WB final — winner goes to grand_final slot a
             const gf = db.prepare(`
                 SELECT * FROM matches WHERE tournament_id = ?
                 AND bracket = 'grand_final' AND round = 1 AND position = 1
@@ -412,7 +421,7 @@ function advanceDoubleElim(tournamentId, match, winner, loser, maxParticipants) 
             }
         }
 
-        // 2. Perdant : descend dans LB
+        // 2. Loser: drop to LB
         if (loser != null) {
             const target = getLoserBracketTarget(match.round, match.position, size);
             const lbMatch = db.prepare(`
@@ -426,7 +435,7 @@ function advanceDoubleElim(tournamentId, match, winner, loser, maxParticipants) 
         }
 
     } else if (match.bracket === 'losers') {
-        // Gagnant LB monte
+        // LB winner advances
         const next = getLoserBracketNext(match.round, match.position, size, lbRounds);
         if (next === null) {
             // Finale LB → grand_final slot b
@@ -447,23 +456,25 @@ function advanceDoubleElim(tournamentId, match, winner, loser, maxParticipants) 
                     .run(winner, nextLb.id);
             }
         }
-        // Perdant LB : éliminé, rien à faire
+        // LB loser: eliminated, nothing to propagate
     }
-    // match.bracket === 'grand_final' : tournoi terminé, rien à propager
-    // (la fin est manuelle via le bouton "Terminer le tournoi")
+    // grand_final: nothing to propagate — tournament end is triggered manually
 
-    // Propagation des BYE en cascade après chaque avancement
+    // cascade BYE propagation after each advancement
     propagateByesDouble(tournamentId, maxParticipants);
 }
 
 /**
- * Propage les BYE en double élim, en cascade et de manière itérative.
+ * Iteratively propagates BYEs in a double-elimination bracket.
  *
- * Cas BYE possibles :
- *   - WB round R : un seul participant présent → qualifie en WB R+1 ET ne génère pas de perdant pour le LB
- *     → le slot LB qui attendait ce perdant doit aussi être traité comme BYE (l'autre participant qualifie)
- *   - LB round R : un seul participant présent → qualifie en LB R+1
- *   - Grand final : un seul participant présent → c'est qu'on n'a pas géré quelque chose, ne devrait pas arriver
+ * BYE cases:
+ *   - WB: one participant present → qualifies to WB R+1, generates no LB loser;
+ *     the LB slot that awaited that loser is then treated as a BYE too
+ *   - LB: one participant present → qualifies to LB R+1
+ *   - Grand final: one participant present — should not happen
+ *
+ * @param {number} tournamentId
+ * @param {number} maxParticipants
  */
 function propagateByesDouble(tournamentId, maxParticipants) {
     let size = 1;
@@ -485,7 +496,7 @@ function propagateByesDouble(tournamentId, maxParticipants) {
             const hasB = m.participant_b != null;
             if (hasA && hasB) continue;
 
-            // Cas 1 : un seul participant présent — BYE classique
+            // one participant present — standard BYE
             if (hasA || hasB) {
                 const present = hasA ? m.participant_a : m.participant_b;
                 if (canSlotStillBeFilled(m, hasA ? 'b' : 'a', all, size, wbRounds, lbRounds)) continue;
@@ -498,11 +509,7 @@ function propagateByesDouble(tournamentId, maxParticipants) {
                 continue;
             }
 
-            // Cas 2 : match complètement vide.
-            // On ne le clôture QUE si :
-            //   - aucun slot ne peut plus être rempli
-            //   - ET aucun des deux participants n'est déjà présent (déjà garanti ici car !hasA && !hasB)
-            // On vérifie d'abord si les matchs amont possibles existent et sont déjà finished sans avoir propagé.
+            // Both slots empty: close the match only when no upstream match can fill either slot.
             const canFillA = canSlotStillBeFilled(m, 'a', all, size, wbRounds, lbRounds);
             const canFillB = canSlotStillBeFilled(m, 'b', all, size, wbRounds, lbRounds);
             if (!canFillA && !canFillB) {
@@ -516,7 +523,15 @@ function propagateByesDouble(tournamentId, maxParticipants) {
 }
 
 /**
- * Détermine si le slot manquant d'un match peut encore être rempli par un match amont.
+ * Returns true if the missing slot of a match can still be filled by an upstream match.
+ *
+ * @param {{ bracket: string, round: number, position: number }} match
+ * @param {'a' | 'b'} missingSlot
+ * @param {Array} allMatches - all matches for the tournament
+ * @param {number} size
+ * @param {number} wbRounds
+ * @param {number} lbRounds
+ * @returns {boolean}
  */
 function canSlotStillBeFilled(match, missingSlot, allMatches, size, wbRounds, lbRounds) {
     const { bracket, round, position } = match;
@@ -581,14 +596,21 @@ function canSlotStillBeFilled(match, missingSlot, allMatches, size, wbRounds, lb
 }
 
 /**
- * Propage le qualifié d'une BYE vers le match aval correspondant.
+ * Propagates the BYE winner to the next match.
+ * Called when a match is closed as a BYE (only one participant present).
+ *
+ * @param {{ bracket: string, round: number, position: number, tournament_id: number }} match
+ * @param {number} winner
+ * @param {number} size
+ * @param {number} wbRounds
+ * @param {number} lbRounds
  */
 function propagateByeWinner(match, winner, size, wbRounds, lbRounds) {
     if (match.bracket === 'winners') {
-        // Gagnant : monte dans WB
+        // Winner: advance in WB
         const nextRound = match.round + 1;
         if (nextRound > wbRounds) {
-            // Finale WB par BYE → GF slot a
+            // WB final BYE — go to GF slot a
             const gf = db.prepare(`SELECT * FROM matches WHERE tournament_id = ?
                 AND bracket = 'grand_final' AND round = 1 AND position = 1`).get(match.tournament_id);
             if (gf) db.prepare('UPDATE matches SET participant_a = ? WHERE id = ?').run(winner, gf.id);
@@ -600,9 +622,9 @@ function propagateByeWinner(match, winner, size, wbRounds, lbRounds) {
                 .get(match.tournament_id, nextRound, nextPos);
             if (next) db.prepare(`UPDATE matches SET participant_${slot} = ? WHERE id = ?`).run(winner, next.id);
         }
-        // Perdant fantôme : on ne propage rien dans le LB (pas de perdant à descendre)
-        // → le slot LB qui aurait reçu ce perdant restera NULL et sera traité par la
-        //   passe suivante de propagateByesDouble comme un slot qui ne peut plus être rempli.
+        // Ghost loser: nothing to propagate to LB (no one dropped out).
+        // The LB slot that would have received this loser stays NULL and will be
+        // resolved on the next propagateByesDouble pass as an unfillable slot.
 
     } else if (match.bracket === 'losers') {
         const next = getLoserBracketNext(match.round, match.position, size, lbRounds);
@@ -619,12 +641,16 @@ function propagateByeWinner(match, winner, size, wbRounds, lbRounds) {
                 .run(winner, nextLb.id);
         }
     }
-    // grand_final BYE : ne devrait pas arriver
+    // grand_final BYE: should not happen
 }
 
 /**
- * Vérifie si, en partant du match donné, un match en aval (round suivant et au-delà)
- * a déjà été joué (status = 'finished').
+ * Returns true if any downstream match (next rounds) has already been played.
+ * Used to block score changes when later matches would be invalidated.
+ *
+ * @param {number} tournamentId
+ * @param {{ round: number, position: number }} match
+ * @returns {boolean}
  */
 function hasDownstreamPlayed(tournamentId, match) {
     let round = match.round + 1;
@@ -642,8 +668,11 @@ function hasDownstreamPlayed(tournamentId, match) {
 }
 
 /**
- * Vide le slot en aval qui contenait l'ancien gagnant.
- * Appelé quand on modifie un score et que le gagnant change.
+ * Nullifies the slot in the next match that contained the previous winner.
+ * Called when a score is corrected and the winner changes.
+ *
+ * @param {number} tournamentId
+ * @param {{ round: number, position: number }} match
  */
 function clearDownstreamSlot(tournamentId, match) {
     const nextRound = match.round + 1;
@@ -659,10 +688,11 @@ function clearDownstreamSlot(tournamentId, match) {
 }
 
 /**
- * Propage les BYE de manière itérative.
- * Une "vraie" BYE = match avec un seul participant ET dont le slot manquant ne sera jamais rempli
- * (pas d'upstream pending qui pourrait le combler).
- * On boucle jusqu'à stabilité car remplir un slot peut déclencher une nouvelle BYE en aval.
+ * Iteratively propagates BYEs in a single-elimination bracket.
+ * A "true" BYE is a match with one participant whose missing slot can no longer be filled.
+ * Loops until stable because filling a slot can trigger further BYEs downstream.
+ *
+ * @param {number} tournamentId
  */
 function propagateByes(tournamentId) {
     let changed = true;
@@ -678,13 +708,12 @@ function propagateByes(tournamentId) {
 
             const hasA = m.participant_a != null;
             const hasB = m.participant_b != null;
-            if (hasA && hasB) continue;   // match complet
-            if (!hasA && !hasB) continue; // match mort, rien à faire
+            if (hasA && hasB) continue;
+            if (!hasA && !hasB) continue; // dead match — both slots empty
 
             const present = hasA ? m.participant_a : m.participant_b;
             const missingSlot = hasA ? 'b' : 'a';
 
-            // Vérifie si le slot manquant peut encore être rempli par un match en amont
             let upstreamPending = false;
             if (m.round > 1) {
                 const upstreamPos = missingSlot === 'a' ? 2 * m.position - 1 : 2 * m.position;
@@ -696,7 +725,7 @@ function propagateByes(tournamentId) {
             }
             if (upstreamPending) continue;
 
-            // Vraie BYE : on clôture le match et on propage
+            // confirmed BYE — close and propagate
             db.prepare(
                 `UPDATE matches SET winner = ?, loser = NULL, status = 'finished' WHERE id = ?`
             ).run(present, m.id);
@@ -716,7 +745,10 @@ function propagateByes(tournamentId) {
 }
 
 /**
- * Marque le tournoi comme 'finished' si tous les matchs sont joués.
+ * Marks the tournament as 'finished' if all matches have been played.
+ *
+ * @param {number} tournamentId
+ * @param {string} format
  */
 function checkTournamentFinished(tournamentId, format) {
     const remaining = db.prepare(`
@@ -733,7 +765,7 @@ function checkTournamentFinished(tournamentId, format) {
 // ROUTES
 // =================================================================
 
-// POST /api/tournaments/:id/start — démarre le tournoi
+// POST /api/tournaments/:id/start - start the tournament
 router.post('/:id/start', auth, (req, res) => {
     const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(req.params.id);
     if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
@@ -749,7 +781,7 @@ router.post('/:id/start', auth, (req, res) => {
     try {
         const tx = db.transaction(() => {
             if (tournament.format === 'round_robin') {
-                // Pas de seeding préalable pour le round robin : on génère au démarrage
+                // round robin has no pre-seeding — generate the schedule at start time
                 db.prepare('DELETE FROM matches WHERE tournament_id = ?').run(tournament.id);
 
                 const schedule = generateRoundRobin(participants);
@@ -763,15 +795,15 @@ router.post('/:id/start', auth, (req, res) => {
                 }
 
             } else if (tournament.format === 'single_elimination') {
-                // Le bracket a déjà été généré et seedé par le manager (drag & drop).
-                // Vérification : au moins un match round 1 doit exister.
+                // Bracket already generated and seeded by the manager (drag & drop).
+                // Guard: at least one round-1 match must exist.
                 const r1Count = db.prepare(
                     'SELECT COUNT(*) AS c FROM matches WHERE tournament_id = ? AND round = 1'
                 ).get(tournament.id).c;
                 if (r1Count === 0) {
                     throw new Error('The bracket has not been generated');
                 }
-                // Propage les BYE (slots vides au round 1) vers les rounds suivants
+                // propagate BYEs from empty round-1 slots
                 propagateByes(tournament.id);
 
             } else if (tournament.format === 'double_elimination') {
@@ -794,7 +826,7 @@ router.post('/:id/start', auth, (req, res) => {
     }
 });
 
-// PUT /api/tournaments/:id/matches/:matchId — saisie/modification du score
+// PUT /api/tournaments/:id/matches/:matchId - record or update a match score
 router.put('/:id/matches/:matchId', auth, (req, res) => {
     const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(req.params.id);
     if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
@@ -821,8 +853,8 @@ router.put('/:id/matches/:matchId', auth, (req, res) => {
     const winner = sa > sb ? match.participant_a : match.participant_b;
     const loser  = sa > sb ? match.participant_b : match.participant_a;
 
-    // En single elim : si on MODIFIE un score déjà saisi, et que le gagnant change,
-    // on bloque si des matchs en aval sont déjà joués (l'ancien gagnant est peut-être déjà en train de jouer)
+    // If modifying an already-set score and the winner changes,
+    // block if downstream matches have already been played.
     const isRealFinished = match.status === 'finished' && match.winner != null;
     if ((tournament.format === 'single_elimination' || tournament.format === 'double_elimination')
         && isRealFinished) {
@@ -859,7 +891,7 @@ router.put('/:id/matches/:matchId', auth, (req, res) => {
             } else if (tournament.format === 'double_elimination') {
                 advanceDoubleElim(tournament.id, match, winner, loser, tournament.max_participants);
             }
-            // round_robin : pas d'avancement, le classement est recalculé à la lecture
+            // round_robin: no advancement — standings are computed on read
         });
         tx();
         res.json({ success: true });
@@ -869,7 +901,7 @@ router.put('/:id/matches/:matchId', auth, (req, res) => {
     }
 });
 
-// GET /api/tournaments/:id/standings — classement round-robin
+// GET /api/tournaments/:id/standings - round-robin standings
 router.get('/:id/standings', (req, res) => {
     const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(req.params.id);
     if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
@@ -884,7 +916,7 @@ router.get('/:id/standings', (req, res) => {
     res.json(computeStandings(matches, participants));
 });
 
-// POST /api/tournaments/:id/finish — clôture manuelle du tournoi
+// POST /api/tournaments/:id/finish - manually close a tournament
 router.post('/:id/finish', auth, (req, res) => {
     const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(req.params.id);
     if (!tournament) return res.status(404).json({ error: 'Tournament not found' });

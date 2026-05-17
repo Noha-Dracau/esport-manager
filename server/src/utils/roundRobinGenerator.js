@@ -1,25 +1,23 @@
-// server/src/utils/roundRobinGenerator.js
-
 /**
- * Génère un calendrier round-robin (méthode du cercle).
- * Chaque participant affronte chaque autre participant exactement une fois.
+ * Generates a round-robin schedule using the circle method.
+ * Each participant faces every other participant exactly once.
  *
  * @param {Array<number>} participantIds
- * @returns {Array<{round, position, participant_a, participant_b}>}
+ * @returns {Array<{round: number, position: number, participant_a: number, participant_b: number}>}
  */
 function generateRoundRobin(participantIds) {
     if (participantIds.length < 2) return [];
 
     const participants = [...participantIds];
     const isOdd = participants.length % 2 !== 0;
-    if (isOdd) participants.push(null); // BYE placeholder (joueur qui se repose)
+    if (isOdd) participants.push(null); // BYE placeholder — this participant rests for one round
 
     const n = participants.length;
     const totalRounds = n - 1;
     const matchesPerRound = n / 2;
     const schedule = [];
 
-    // On fixe le premier participant, on fait tourner les autres dans le sens horaire
+    // First participant stays fixed; the rest rotate clockwise
     let rotating = participants.slice(1);
 
     for (let round = 1; round <= totalRounds; round++) {
@@ -29,7 +27,7 @@ function generateRoundRobin(participantIds) {
         for (let i = 0; i < matchesPerRound; i++) {
             const a = lineup[i];
             const b = lineup[n - 1 - i];
-            // On saute les matchs contenant le BYE — ce participant se repose ce round
+            // Skip BYE matches — one participant rests this round
             if (a !== null && b !== null) {
                 schedule.push({
                     round,
@@ -40,7 +38,7 @@ function generateRoundRobin(participantIds) {
             }
         }
 
-        // Rotation : le dernier élément revient en première position du segment tournant
+        // Rotate: last element wraps to the front of the rotating segment
         rotating = [rotating[rotating.length - 1], ...rotating.slice(0, -1)];
     }
 
@@ -48,13 +46,13 @@ function generateRoundRobin(participantIds) {
 }
 
 /**
- * Calcule le classement round-robin à partir des matchs terminés.
- * Barème : victoire = 3 pts, défaite = 0 pt.
- * Départage : pts → victoires → confrontation directe → id (stable).
+ * Computes round-robin standings from finished matches.
+ * Scoring: win = 3 pts, loss = 0 pts.
+ * Tiebreakers: points → wins → head-to-head → id (stable).
  *
- * @param {Array} matches - lignes matches de la base (avec winner, loser, status)
+ * @param {Array} matches - match rows from the database (with winner, loser, status)
  * @param {Array<number>} participantIds
- * @returns {Array<{participant_id, played, wins, losses, points, rank}>}
+ * @returns {Array<{participant_id: number, played: number, wins: number, losses: number, points: number, rank: number}>}
  */
 function computeStandings(matches, participantIds) {
     const table = {};
@@ -62,7 +60,7 @@ function computeStandings(matches, participantIds) {
         table[id] = { participant_id: id, played: 0, wins: 0, losses: 0, points: 0 };
     }
 
-    // h2h[a][b] = 1 si a a battu b
+    // h2h[a][b] = 1 if a defeated b
     const h2h = {};
 
     for (const m of matches) {

@@ -15,6 +15,14 @@ const upload = multer({
     }
 });
 
+/**
+ * Returns an Express middleware that accepts a single file upload under the given field name.
+ * Enforces JPEG/PNG/WebP mime types and a 2 MB size limit.
+ * On error, responds with 400 and a descriptive message.
+ *
+ * @param {string} field - Form-data field name for the file.
+ * @returns {import('express').RequestHandler}
+ */
 function uploadSingle(field) {
     return (req, res, next) => {
         upload.single(field)(req, res, (err) => {
@@ -28,6 +36,12 @@ function uploadSingle(field) {
 
 const UPLOADS_DIR = path.join(__dirname, '../../uploads');
 
+/**
+ * Converts an image buffer to WebP (max 800×800, quality 85) and saves it to the uploads directory.
+ *
+ * @param {Buffer} buffer - Raw image data from multer memory storage.
+ * @returns {Promise<string>} URL path relative to the server root (e.g. /uploads/filename.webp).
+ */
 async function saveImage(buffer) {
     const filename = Date.now() + '.webp';
     const filepath = path.join(UPLOADS_DIR, filename);
@@ -39,6 +53,11 @@ async function saveImage(buffer) {
     return `/uploads/${filename}`;
 }
 
+/**
+ * Deletes an uploaded file from disk. No-ops if the path is falsy or the file is already gone.
+ *
+ * @param {string | null | undefined} urlPath - URL path returned by saveImage (e.g. /uploads/foo.webp).
+ */
 function deleteUpload(urlPath) {
     if (!urlPath) return;
     try {

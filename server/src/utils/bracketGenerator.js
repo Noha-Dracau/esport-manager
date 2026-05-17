@@ -1,9 +1,11 @@
-// server/src/utils/bracketGenerator.js
-
 /**
- * Génère un bracket single élimination.
- * Tous les matchs sont créés (avec slots vides pour les rounds > 1).
- * bracket = 'main' pour tous les matchs.
+ * Generates a single-elimination bracket.
+ * All matches are created upfront; round 2+ slots start empty.
+ * All matches use bracket = 'main'.
+ *
+ * @param {Array<number>} participants - ordered list of participant IDs
+ * @param {number} maxParticipants - determines bracket size (next power of 2)
+ * @returns {{ matches: Array, rounds: number, size: number }}
  */
 function generateSingleElimination(participants, maxParticipants) {
     const size = nextPowerOfTwo(maxParticipants);
@@ -37,27 +39,32 @@ function generateSingleElimination(participants, maxParticipants) {
 }
 
 /**
- * Génère un bracket double élimination.
+ * Generates a double-elimination bracket.
  *
- * Structure :
- *   - bracket = 'winners' : winners bracket, comme single elim (R rounds)
- *   - bracket = 'losers'  : losers bracket, 2(R-1) rounds alternant minor/major
- *   - bracket = 'grand_final' : un seul match, round 1, position 1
+ * Structure:
+ *   - bracket = 'winners':    winners bracket, like single elim (R rounds)
+ *   - bracket = 'losers':     losers bracket, 2(R-1) rounds alternating minor/major
+ *   - bracket = 'grand_final': one match, round 1, position 1
  *
- * Convention LB :
- *   - Round LB impair (1, 3, 5...) = "minor" : les rescapés LB jouent entre eux
- *     ou les perdants WB y entrent (cas LB round 1 spécifiquement)
- *   - Round LB pair (2, 4, 6...) = "major" : les rescapés LB affrontent les nouveaux perdants WB
+ * LB convention:
+ *   - Odd LB rounds (1, 3, 5…) = "minor": LB survivors play each other
+ *     (WB round-1 losers feed in for LB round 1 specifically)
+ *   - Even LB rounds (2, 4, 6…) = "major": LB survivors face incoming WB losers
  *
- * Plus précisément :
- *   - LB round 1 : reçoit les perdants de WB round 1 (taille = size/4)
- *   - LB round 2 : reçoit les rescapés de LB round 1 + les perdants de WB round 2 (taille = size/4)
- *   - LB round 3 : minor pur, rescapés de LB round 2 (taille = size/8)
- *   - LB round 4 : major, rescapés LB round 3 + perdants WB round 3 (taille = size/8)
- *   - ... etc.
+ * LB sizing:
+ *   - LB round 1 (minor): size/4 matches  (receives size/2 WB R1 losers)
+ *   - LB round 2 (major): size/4 matches  (LB R1 survivors + WB R2 losers)
+ *   - LB round 3 (minor): size/8 matches  (LB R2 survivors)
+ *   - LB round 4 (major): size/8 matches  (LB R3 survivors + WB R3 losers)
+ *   - … etc.
+ *   - LB round lbRounds:  1 match         (LB final)
  *
- * Anti-snake : à chaque descente WB→LB, les perdants sont placés en ordre inversé pour
- * éviter de retomber sur leur ancien adversaire WB. Le mapping est calculé déterministiquement.
+ * Anti-snake: on each WB→LB drop, losers are placed in reverse order to avoid
+ * rematches against their previous WB opponent. Mapping is deterministic.
+ *
+ * @param {Array<number>} participants - ordered list of participant IDs
+ * @param {number} maxParticipants - determines bracket size (next power of 2)
+ * @returns {{ matches: Array, wbRounds: number, lbRounds: number, size: number }}
  */
 function generateDoubleElimination(participants, maxParticipants) {
     const size = nextPowerOfTwo(maxParticipants);
@@ -89,23 +96,15 @@ function generateDoubleElimination(participants, maxParticipants) {
     }
 
     // -------- Losers Bracket --------
-    // Tailles :
-    //   - LB round 1 (minor) : size/4 matchs (reçoit les size/2 perdants de WB R1)
-    //   - LB round 2 (major) : size/4 matchs (rescapés LB R1 + perdants WB R2)
-    //   - LB round 3 (minor) : size/8 matchs (rescapés LB R2 entre eux)
-    //   - LB round 4 (major) : size/8 matchs (rescapés LB R3 + perdants WB R3)
-    //   - ...
-    //   - LB round lbRounds : 1 match (finale LB)
     for (let lbR = 1; lbR <= lbRounds; lbR++) {
-        const isMinor = lbR % 2 === 1; // minor sur rounds impairs
-        // Le "pas" qui définit combien de joueurs restent à ce round
-        // minor : taille = size / 2^( (lbR+3)/2 )  → simplification ci-dessous
+        const isMinor = lbR % 2 === 1; // odd rounds are minor
+        // match count per LB round — minor: size / 2^((lbR+3)/2)
         let matchCount;
         if (isMinor) {
-            // lbR = 1 → size/4 ; lbR = 3 → size/8 ; lbR = 5 → size/16 ...
+            // lbR = 1 → size/4; lbR = 3 → size/8; lbR = 5 → size/16 …
             matchCount = size / Math.pow(2, (lbR + 3) / 2);
         } else {
-            // lbR = 2 → size/4 ; lbR = 4 → size/8 ; lbR = 6 → size/16 ...
+            // lbR = 2 → size/4; lbR = 4 → size/8; lbR = 6 → size/16 …
             matchCount = size / Math.pow(2, (lbR + 2) / 2);
         }
         matchCount = Math.max(1, Math.floor(matchCount));
@@ -136,23 +135,28 @@ function nextPowerOfTwo(n) {
 }
 
 /**
- * Calcule où va le perdant d'un match WB.
- * Retourne { round, position, slot } dans le losers bracket, ou null si pas applicable.
+ * Returns where a WB match loser goes in the losers bracket.
+ * Returns { round, position, slot } in the LB.
  *
- * Mapping anti-snake :
- *   - Perdants de WB round 1 (taille size/2) → LB round 1 (taille size/4)
- *     Ordre direct : perdants des positions 1-2 → match LB position 1, etc.
- *     (premier round LB, pas d'anti-snake nécessaire car personne n'a encore croisé personne)
+ * Anti-snake mapping:
+ *   - WB round 1 losers (size/2) → LB round 1 (size/4 matches)
+ *     Direct order: losers from positions 1-2 → LB match 1, etc.
+ *     (No anti-snake needed for LB R1 — no one has faced anyone yet.)
  *
- *   - Perdants de WB round R (R >= 2) → LB round 2(R-1) (major)
- *     Anti-snake : ordre inversé pour éviter qu'un joueur retombe sur son ancien adversaire WB.
+ *   - WB round R losers (R >= 2) → LB round 2(R-1) (major)
+ *     Anti-snake: reversed order to prevent rematches against a previous WB opponent.
  *
- * Le slot dans le match LB cible : 'a' si on entre en major depuis WB, ce qui laisse 'b' au rescapé LB.
- * Pour LB R1 (qui n'a pas de rescapé en entrée), on remplit a puis b par paires.
+ * Slot in the target LB match: 'a' for WB drop-ins (leaving 'b' for the LB survivor).
+ * For LB R1 (no survivor entering), pairs fill both 'a' and 'b'.
+ *
+ * @param {number} wbRound - winners bracket round of the finished match
+ * @param {number} wbPosition - position of the finished match (1-indexed)
+ * @param {number} size - bracket size (next power of 2 from maxParticipants)
+ * @returns {{ round: number, position: number, slot: 'a' | 'b' }}
  */
 function getLoserBracketTarget(wbRound, wbPosition, size) {
     if (wbRound === 1) {
-        // size/2 perdants → size/4 matchs LB R1 : 2 perdants par match
+        // size/2 losers → size/4 LB R1 matches: 2 losers per match
         const lbPosition = Math.ceil(wbPosition / 2);
         const slot = wbPosition % 2 === 1 ? 'a' : 'b';
         return { round: 1, position: lbPosition, slot };
@@ -160,35 +164,42 @@ function getLoserBracketTarget(wbRound, wbPosition, size) {
 
     // WB round R (R >= 2) → LB round 2(R-1) (major round)
     const lbRound = 2 * (wbRound - 1);
-    // Nombre de matchs WB round R = size / 2^R, et nombre de matchs LB major R = pareil
+    // WB matches in round R = size / 2^R, same as LB major matches
     const wbMatchesInRound = size / Math.pow(2, wbRound);
-    // Anti-snake : inversion de l'ordre
+    // anti-snake: reverse the order
     const lbPosition = wbMatchesInRound - wbPosition + 1;
-    // Le perdant WB prend le slot 'a' du match LB major (le rescapé LB précédent prend 'b')
+    // WB loser takes slot 'a' in the LB major match (LB survivor takes 'b')
     return { round: lbRound, position: lbPosition, slot: 'a' };
 }
 
 /**
- * Calcule où va le gagnant d'un match LB.
- * Retourne { round, position, slot } dans le losers bracket, ou null si c'était la finale LB.
+ * Returns where a LB match winner goes next in the losers bracket.
+ * Returns { round, position, slot }, or null if this was the LB final.
  *
- * Convention :
- *   - Gagnant LB round impair (minor) → LB round R+1 (major), slot 'b' (le slot 'a' attend un perdant WB)
- *   - Gagnant LB round pair (major) → LB round R+1 (minor), pair par pair sur le slot 'a' ou 'b'
- *   - Gagnant de la finale LB (round = lbRounds) → grand final, slot 'b'
+ * Routing:
+ *   - Odd LB round (minor) winner → LB round R+1 (major), slot 'b'
+ *     (slot 'a' is reserved for the incoming WB loser)
+ *   - Even LB round (major) winner → LB round R+1 (minor), paired into slot 'a' or 'b'
+ *   - LB final winner (round = lbRounds) → grand final, slot 'b'
+ *
+ * @param {number} lbRound - current LB round
+ * @param {number} lbPosition - position within the LB round (1-indexed)
+ * @param {number} size - bracket size
+ * @param {number} lbRounds - total number of LB rounds
+ * @returns {{ round: number, position: number, slot: 'a' | 'b' } | null}
  */
 function getLoserBracketNext(lbRound, lbPosition, size, lbRounds) {
     if (lbRound === lbRounds) {
-        return null; // finale LB, va en GF
+        return null; // LB final — goes to GF
     }
 
     const isMinor = lbRound % 2 === 1;
 
     if (isMinor) {
-        // → major round suivant, slot 'b' (le 'a' attend un perdant WB)
+        // → next major round, slot 'b' (slot 'a' is reserved for a WB loser)
         return { round: lbRound + 1, position: lbPosition, slot: 'b' };
     } else {
-        // major → minor : on apparie les gagnants 2 par 2
+        // major → minor: pair winners 2 by 2
         const nextPosition = Math.ceil(lbPosition / 2);
         const slot = lbPosition % 2 === 1 ? 'a' : 'b';
         return { round: lbRound + 1, position: nextPosition, slot };
