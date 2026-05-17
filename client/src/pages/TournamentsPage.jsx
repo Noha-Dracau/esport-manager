@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 
 export default function TournamentsPage() {
@@ -10,6 +11,7 @@ export default function TournamentsPage() {
     const [status, setStatus]           = useState('');
     const [games, setGames]             = useState([]);
     const navigate = useNavigate();
+    const { user } = useAuth();
 
     useEffect(() => {
         api.get('/tournaments/games').then(r => setGames(r.data));
@@ -22,7 +24,14 @@ export default function TournamentsPage() {
 
     return (
         <div>
-            <h1>Tournaments</h1>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <h1 style={{ margin: 0 }}>Tournaments</h1>
+                {user && (
+                    <button onClick={() => navigate('/create-tournament')} style={btnStyle}>
+                        ➕ Create a tournament
+                    </button>
+                )}
+            </div>
 
             {/* Searchbar + filters */}
             <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
@@ -94,6 +103,12 @@ export default function TournamentsPage() {
 const inputStyle = {
     padding: '0.6rem 1rem', borderRadius: '8px',
     border: '1px solid #333', background: '#1a1a2e', color: '#fff', flex: 1
+};
+
+const btnStyle = {
+    padding: '0.7rem 1.5rem', background: '#FCA616',
+    color: '#14203E', border: 'none', borderRadius: '8px',
+    fontSize: '1rem', cursor: 'pointer'
 };
 
 const cardStyle = (status) => ({

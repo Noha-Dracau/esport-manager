@@ -28,10 +28,6 @@ export default function Sidebar() {
             <NavLink to="/"      style={navStyle}>Tournaments</NavLink>
             <NavLink to="/teams" style={navStyle}>Teams</NavLink>
 
-            {user && (
-                <NavLink to="/create-tournament" style={navStyle}>Create a tournament</NavLink>
-            )}
-
             {/* Profile */}
             <div style={{ marginTop: 'auto' }}>
                 {user ? (
