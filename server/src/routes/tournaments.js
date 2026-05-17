@@ -385,7 +385,6 @@ function advanceSingleElim(tournamentId, match, winnerId) {
  * Selon le bracket du match terminé, fait avancer gagnant et perdant.
  */
 function advanceDoubleElim(tournamentId, match, winner, loser, maxParticipants) {
-    const { nextPowerOfTwo } = require('../utils/bracketGenerator');
     // On a besoin de la taille, recalcule simplement :
     let size = 1;
     while (size < maxParticipants) size *= 2;
@@ -861,9 +860,6 @@ router.put('/:id/matches/:matchId', auth, (req, res) => {
                 }
                 advanceSingleElim(tournament.id, match, winner);
             } else if (tournament.format === 'double_elimination') {
-                if (isRealFinished && match.winner !== winner) {
-                    throw new Error('Winner change not supported in double elimination');
-                }
                 advanceDoubleElim(tournament.id, match, winner, loser, tournament.max_participants);
             }
             // round_robin : pas d'avancement, le classement est recalculé à la lecture

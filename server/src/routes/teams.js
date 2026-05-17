@@ -56,8 +56,10 @@ router.post('/', auth, uploadSingle('logo'), async (req, res) => {
             .run(result.lastInsertRowid, req.user.id);
 
         res.status(201).json({ id: result.lastInsertRowid });
-    } catch {
-        res.status(409).json({ error: 'Team name already taken!' });
+    } catch (err) {
+        if (err.message?.includes('UNIQUE'))
+            return res.status(409).json({ error: 'Team name already taken!' });
+        res.status(500).json({ error: 'Database error' });
     }
 });
 
