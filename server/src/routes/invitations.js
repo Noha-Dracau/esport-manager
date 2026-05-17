@@ -25,6 +25,9 @@ router.post('/', auth, (req, res) => {
 // PATCH /api/invitations/:id - Accept or decline
 router.patch('/:id', auth, (req, res) => {
     const { status } = req.body;
+    if (!['accepted', 'declined'].includes(status))
+        return res.status(400).json({ error: "Invalid status: must be 'accepted' or 'declined'" });
+
     const invitation = db.prepare('SELECT * FROM invitations WHERE id = ?').get(req.params.id);
     if (!invitation) return res.status(404).json({ error: 'Unfound invitation' });
 

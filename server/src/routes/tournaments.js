@@ -279,7 +279,9 @@ router.patch('/:id/bracket/swap', auth, (req, res) => {
         return res.status(400).json({ error: 'Cannot swap participants in a tournament that has already started' });
 
     const { matchId, slot, targetMatchId, targetSlot } = req.body;
-    // slot et targetSlot valent 'a' ou 'b'
+
+    if (!['a', 'b'].includes(slot) || !['a', 'b'].includes(targetSlot))
+        return res.status(400).json({ error: "Invalid slot: must be 'a' or 'b'" });
 
     const matchA = db.prepare('SELECT * FROM matches WHERE id = ? AND tournament_id = ?')
         .get(matchId, req.params.id);
