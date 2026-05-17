@@ -50,6 +50,8 @@ A web application for organizing and managing esports tournaments. Create tourna
 - Inline styles (no external CSS framework)
 
 ## Project structure
+
+```
 esport-manager/
 ├── server/
 │   ├── src/
@@ -62,12 +64,13 @@ esport-manager/
 │   ├── uploads/                 User-uploaded images (gitignored)
 │   └── .env                     Environment variables (gitignored)
 └── client/
-└── src/
-├── api/                 Axios instance
-├── components/          Reusable components
-├── constants/           Static data (games list, etc.)
-├── context/             React contexts (auth)
-└── pages/               Top-level route components
+    └── src/
+        ├── api/                 Axios instance
+        ├── components/          Reusable components
+        ├── constants/           Static data (games list, etc.)
+        ├── context/             React contexts (auth)
+        └── pages/               Top-level route components
+```
 
 ## Getting started
 
@@ -166,5 +169,6 @@ Authentication is required for all write operations. JWT tokens are sent in the 
 ## License
 
 This project is provided as-is for educational purposes.
-- Noha Robert--Altese
+
+Noha Robert--Altese
 
