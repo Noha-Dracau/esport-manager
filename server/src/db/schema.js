@@ -74,6 +74,7 @@ function runMigrations() {
     try { db.exec("ALTER TABLE matches ADD COLUMN score_a INTEGER"); } catch (e) {}
     try { db.exec("ALTER TABLE matches ADD COLUMN score_b INTEGER"); } catch (e) {}
     try { db.exec("ALTER TABLE users ADD COLUMN discord_username TEXT"); } catch (e) {}
+    try { db.exec("ALTER TABLE teams ADD COLUMN bio TEXT"); } catch (e) {}
 }
 
 module.exports = { initSchema };

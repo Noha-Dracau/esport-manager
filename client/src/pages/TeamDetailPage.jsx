@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
+import DiscordBadge from '../components/DiscordBadge';
 
 export default function TeamDetailPage() {
     const { id } = useParams();
@@ -11,7 +12,7 @@ export default function TeamDetailPage() {
     const [error, setError]     = useState('');
     const [success, setSuccess] = useState('');
     const [editing, setEditing] = useState(false);
-    const [form, setForm]       = useState({ name: '' });
+    const [form, setForm]       = useState({ name: '', bio: '' });
     const [logo, setLogo]       = useState(null);
 
     async function fetchTeam() {
@@ -76,6 +77,7 @@ export default function TeamDetailPage() {
         try {
             const formData = new FormData();
             formData.append('name', form.name);
+            formData.append('bio', form.bio);
             if (logo) formData.append('logo', logo);
             await api.patch(`/teams/${id}`, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
@@ -131,6 +133,20 @@ export default function TeamDetailPage() {
                                 style={inputStyle}
                             />
                             <div>
+                                <label style={{ color: '#888', fontSize: '0.85rem', display: 'block', marginBottom: '0.3rem' }}>Bio</label>
+                                <textarea
+                                    value={form.bio}
+                                    onChange={e => setForm({ ...form, bio: e.target.value })}
+                                    maxLength={220}
+                                    placeholder="Tell others about your team. You can include a link."
+                                    rows={3}
+                                    style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}
+                                />
+                                <p style={{ color: '#555', fontSize: '0.75rem', textAlign: 'right', margin: '-0.3rem 0 0.3rem' }}>
+                                    {form.bio.trim().length}/200
+                                </p>
+                            </div>
+                            <div>
                                 <label style={{ color: '#888', fontSize: '0.85rem', display: 'block', marginBottom: '0.3rem' }}>New logo</label>
                                 <input type="file" accept="image/*" onChange={e => setLogo(e.target.files[0])} style={{ color: '#EAEAEA' }} />
                             </div>
@@ -138,7 +154,8 @@ export default function TeamDetailPage() {
                     ) : (
                         <>
                             <h1 style={{ margin: '0 0 0.3rem' }}>{team.name}</h1>
-                            <p style={{ color: '#EAEAEA', margin: 0 }}>
+                            <BioText bio={team.bio} />
+                            <p style={{ color: '#EAEAEA', margin: '0.3rem 0 0' }}>
                                 {isManager ? 'You are the manager' : isMember ? 'You are a member' : ''}
                             </p>
                         </>
@@ -155,7 +172,7 @@ export default function TeamDetailPage() {
                             </>
                         ) : (
                             <>
-                                <button onClick={() => { setForm({ name: team.name }); setLogo(null); setEditing(true); }} style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: 'none', background: '#FCA616', color: '#14203E', cursor: 'pointer' }}>Modify</button>
+                                <button onClick={() => { setForm({ name: team.name, bio: team.bio ?? '' }); setLogo(null); setEditing(true); }} style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: 'none', background: '#FCA616', color: '#14203E', cursor: 'pointer' }}>Modify</button>
                                 <button onClick={handleDelete} style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid #e74c3c', background: 'transparent', color: '#e74c3c', cursor: 'pointer' }}>Delete the team</button>
                             </>
                         )}
@@ -227,7 +244,10 @@ export default function TeamDetailPage() {
                                     : member.username[0].toUpperCase()
                                 }
                             </div>
-                            <span style={{ flex: 1 }}>{member.username}</span>
+                            <span style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                {member.username}
+                                <DiscordBadge username={member.discord_username} />
+                            </span>
                             {member.id === team.manager_id && (
                                 <span style={{ color: '#f59e0b', fontSize: '0.75rem' }}>👑 Manager</span>
                             )}
@@ -323,6 +343,25 @@ export default function TeamDetailPage() {
                 </div>
             )}
         </div>
+    );
+}
+
+const URL_SPLIT = /(\b(?:https?:\/\/)?[a-z0-9-]+(?:\.[a-z0-9-]+)+(?:\/\S*)?)/gi;
+const URL_TEST  = /^(?:https?:\/\/)?[a-z0-9-]+(?:\.[a-z0-9-]+)+(?:\/\S*)?$/i;
+
+function BioText({ bio }) {
+    if (!bio) return null;
+    const parts = bio.split(URL_SPLIT);
+    return (
+        <p style={{ color: '#a1a1a1', margin: '0.3rem 0 0', fontSize: '0.9rem', lineHeight: '1.5' }}>
+            {parts.map((part, i) =>
+                URL_TEST.test(part)
+                    ? <a key={i} href={/^https?:\/\//i.test(part) ? part : `https://${part}`}
+                         target="_blank" rel="noopener noreferrer"
+                         style={{ color: '#FCA616', textDecoration: 'underline' }}>{part}</a>
+                    : part
+            )}
+        </p>
     );
 }
 

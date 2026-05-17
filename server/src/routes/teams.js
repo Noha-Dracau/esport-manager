@@ -19,7 +19,7 @@ router.get('/:id', (req, res) => {
     if (!team) return res.status(404).json({ error: 'Team not found' });
 
     const members = db.prepare(
-        'SELECT id, username, avatar_url FROM users WHERE team_id = ?'
+        'SELECT id, username, avatar_url, discord_username FROM users WHERE team_id = ?'
     ).all(req.params.id);
 
     const pending = db.prepare(
@@ -68,15 +68,23 @@ router.patch('/:id', auth, uploadSingle('logo'), async (req, res) => {
     if (team.manager_id !== req.user.id)
         return res.status(403).json({ error: 'Unauthorized' });
 
-    const { name } = req.body;
+    const { name, bio } = req.body;
     if (name && name.length > 50)
         return res.status(400).json({ error: "Field 'name' must not exceed 50 characters" });
+
+    let bioValue = team.bio;
+    if (bio !== undefined) {
+        const bioTrimmed = bio.trim();
+        if (bioTrimmed.length > 200)
+            return res.status(400).json({ error: "Field 'bio' must not exceed 200 characters" });
+        bioValue = bioTrimmed === '' ? null : bioTrimmed;
+    }
 
     if (req.file && team.logo_url) deleteUpload(team.logo_url);
     const logo_url = req.file ? await saveImage(req.file.buffer) : team.logo_url;
 
-    db.prepare('UPDATE teams SET name = ?, logo_url = ? WHERE id = ?')
-        .run(name || team.name, logo_url, req.params.id);
+    db.prepare('UPDATE teams SET name = ?, logo_url = ?, bio = ? WHERE id = ?')
+        .run(name || team.name, logo_url, bioValue, req.params.id);
 
     res.json({ success: true });
 });
