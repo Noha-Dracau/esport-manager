@@ -44,7 +44,7 @@ router.post('/login', (req, res) => {
         process.env.JWT_SECRET,
         { expiresIn: '7d' }
     );
-    res.json({ token, userId: user.id, username: user.username, teamId: user.team_id });
+    res.json({ token, userId: user.id, username: user.username, teamId: user.team_id, avatarUrl: user.avatar_url ?? null });
 });
 
 module.exports = router;

@@ -36,7 +36,27 @@ export default function Sidebar() {
             <div style={{ marginTop: 'auto' }}>
                 {user ? (
                     <>
-                        <NavLink to="/profile" style={navStyle}>{user.username}</NavLink>
+                        <NavLink to="/profile" style={navStyle}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                                {user.avatarUrl ? (
+                                    <img
+                                        src={`http://localhost:3001${user.avatarUrl}`}
+                                        alt={user.username}
+                                        style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+                                    />
+                                ) : (
+                                    <span style={{
+                                        width: '28px', height: '28px', borderRadius: '50%',
+                                        background: '#14203E', color: '#FCA616',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        fontSize: '0.75rem', fontWeight: 'bold', flexShrink: 0
+                                    }}>
+                                        {user.username?.[0]?.toUpperCase()}
+                                    </span>
+                                )}
+                                {user.username}
+                            </span>
+                        </NavLink>
                         <button onClick={() => { logout(); navigate('/'); }} style={btnStyle}>
                             Disconnect
                         </button>
@@ -69,7 +89,7 @@ const navStyle = ({ isActive }) => ({
 });
 
 const btnStyle = {
-    marginTop: '0.5rem', width: '100%', padding: '0.6rem',
-    background: 'transparent', border: '1px solid #e74c3c',
+    marginTop: '0.5rem', width: '100%', padding: '0.5rem',
+    background: 'transparent', border: '2px solid #e74c3c',
     color: '#e74c3c', borderRadius: '8px', cursor: 'pointer'
 };

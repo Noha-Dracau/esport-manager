@@ -7,8 +7,8 @@ const { uploadSingle, saveImage, deleteUpload } = require('../middleware/upload'
 router.get('/', (req, res) => {
     const { search } = req.query;
     const query = search
-        ? 'SELECT * FROM teams WHERE name LIKE ?'
-        : 'SELECT * FROM teams';
+        ? 'SELECT * FROM teams WHERE name LIKE ? ORDER BY name COLLATE NOCASE ASC'
+        : 'SELECT * FROM teams ORDER BY name COLLATE NOCASE ASC';
     const params = search ? [`%${search}%`] : [];
     res.json(db.prepare(query).all(...params));
 });
