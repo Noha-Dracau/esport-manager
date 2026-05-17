@@ -42,7 +42,7 @@ export default function Sidebar() {
                                     />
                                 ) : (
                                     <span style={{
-                                        width: '28px', height: '28px', borderRadius: '50%',
+                                        width: '48px', height: '48px', borderRadius: '50%',
                                         background: '#14203E', color: '#FCA616',
                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                                         fontSize: '0.75rem', fontWeight: 'bold', flexShrink: 0
