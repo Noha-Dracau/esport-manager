@@ -10,6 +10,9 @@ export default function TeamDetailPage() {
     const [team, setTeam]       = useState(null);
     const [error, setError]     = useState('');
     const [success, setSuccess] = useState('');
+    const [editing, setEditing] = useState(false);
+    const [form, setForm]       = useState({ name: '' });
+    const [logo, setLogo]       = useState(null);
 
     async function fetchTeam() {
         const res = await api.get(`/teams/${id}`);
@@ -68,6 +71,23 @@ export default function TeamDetailPage() {
         } catch (err) { setError(err.response?.data?.error || 'Error'); }
     }
 
+    async function handleSave() {
+        setError('');
+        try {
+            const formData = new FormData();
+            formData.append('name', form.name);
+            if (logo) formData.append('logo', logo);
+            await api.patch(`/teams/${id}`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            setEditing(false);
+            setSuccess('Team updated!');
+            fetchTeam();
+        } catch (err) {
+            setError(err.response?.data?.error || 'Error');
+        }
+    }
+
     async function handleDelete() {
         if (!confirm('Delete the team (no going back)?')) return;
         try {
@@ -88,32 +108,58 @@ export default function TeamDetailPage() {
 
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', marginBottom: '2rem' }}>
-                <div style={{
-                    width: '80px', height: '80px', borderRadius: '12px',
-                    background: 'transparent', display: 'flex', alignItems: 'center',
-                    justifyContent: 'center', fontSize: '2rem', fontWeight: 'bold',
-                    overflow: 'hidden', flexShrink: 0
-                }}>
-                    {team.logo_url
-                        ? <img src={`http://localhost:3001${team.logo_url}`} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        : team.name[0].toUpperCase()
-                    }
-                </div>
+                {!editing && (
+                    <div style={{
+                        width: '80px', height: '80px', borderRadius: '12px',
+                        background: 'transparent', display: 'flex', alignItems: 'center',
+                        justifyContent: 'center', fontSize: '2rem', fontWeight: 'bold',
+                        overflow: 'hidden', flexShrink: 0
+                    }}>
+                        {team.logo_url
+                            ? <img src={`http://localhost:3001${team.logo_url}`} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            : team.name[0].toUpperCase()
+                        }
+                    </div>
+                )}
                 <div style={{ flex: 1 }}>
-                    <h1 style={{ margin: '0 0 0.3rem' }}>{team.name}</h1>
-                    <p style={{ color: '#EAEAEA', margin: 0 }}>
-                        {isManager ? 'You are the manager' : isMember ? 'You are a member' : ''}
-                    </p>
+                    {editing ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                            <input
+                                value={form.name}
+                                onChange={e => setForm({ ...form, name: e.target.value })}
+                                maxLength={50}
+                                style={inputStyle}
+                            />
+                            <div>
+                                <label style={{ color: '#888', fontSize: '0.85rem', display: 'block', marginBottom: '0.3rem' }}>New logo</label>
+                                <input type="file" accept="image/*" onChange={e => setLogo(e.target.files[0])} style={{ color: '#EAEAEA' }} />
+                            </div>
+                        </div>
+                    ) : (
+                        <>
+                            <h1 style={{ margin: '0 0 0.3rem' }}>{team.name}</h1>
+                            <p style={{ color: '#EAEAEA', margin: 0 }}>
+                                {isManager ? 'You are the manager' : isMember ? 'You are a member' : ''}
+                            </p>
+                        </>
+                    )}
                 </div>
 
-                {/* Manager moves */}
+                {/* Manager buttons */}
                 {isManager && (
-                    <button onClick={handleDelete} style={{
-                        padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid #e74c3c',
-                        background: 'transparent', color: '#e74c3c', cursor: 'pointer'
-                    }}>
-                        Delete the team
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+                        {editing ? (
+                            <>
+                                <button onClick={handleSave} style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: 'none', background: '#22c55e', color: '#fff', cursor: 'pointer' }}>Save</button>
+                                <button onClick={() => setEditing(false)} style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid #555', background: 'transparent', color: '#EAEAEA', cursor: 'pointer' }}>Cancel</button>
+                            </>
+                        ) : (
+                            <>
+                                <button onClick={() => { setForm({ name: team.name }); setLogo(null); setEditing(true); }} style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: 'none', background: '#FCA616', color: '#14203E', cursor: 'pointer' }}>Modify</button>
+                                <button onClick={handleDelete} style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid #e74c3c', background: 'transparent', color: '#e74c3c', cursor: 'pointer' }}>Delete the team</button>
+                            </>
+                        )}
+                    </div>
                 )}
 
                 {/* Leave button */}
@@ -280,3 +326,9 @@ export default function TeamDetailPage() {
         </div>
     );
 }
+
+const inputStyle = {
+    width: '100%', padding: '0.6rem 1rem', borderRadius: '8px',
+    border: '1px solid #333', background: '#0f0f23',
+    color: '#fff', fontSize: '1rem', boxSizing: 'border-box'
+};

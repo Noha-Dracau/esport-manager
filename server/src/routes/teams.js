@@ -61,6 +61,26 @@ router.post('/', auth, uploadSingle('logo'), async (req, res) => {
     }
 });
 
+// PATCH /api/teams/:id - update name and/or logo (manager only)
+router.patch('/:id', auth, uploadSingle('logo'), async (req, res) => {
+    const team = db.prepare('SELECT * FROM teams WHERE id = ?').get(req.params.id);
+    if (!team) return res.status(404).json({ error: 'Team not found' });
+    if (team.manager_id !== req.user.id)
+        return res.status(403).json({ error: 'Unauthorized' });
+
+    const { name } = req.body;
+    if (name && name.length > 50)
+        return res.status(400).json({ error: "Field 'name' must not exceed 50 characters" });
+
+    if (req.file && team.logo_url) deleteUpload(team.logo_url);
+    const logo_url = req.file ? await saveImage(req.file.buffer) : team.logo_url;
+
+    db.prepare('UPDATE teams SET name = ?, logo_url = ? WHERE id = ?')
+        .run(name || team.name, logo_url, req.params.id);
+
+    res.json({ success: true });
+});
+
 // DELETE /api/teams/:id - delete the team (manager only)
 router.delete('/:id', auth, (req, res) => {
     const team = db.prepare('SELECT * FROM teams WHERE id = ?').get(req.params.id);
