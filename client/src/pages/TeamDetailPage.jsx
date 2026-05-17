@@ -250,34 +250,33 @@ export default function TeamDetailPage() {
             </div>
 
             {/* Tournaments of the team */}
-            {team.tournaments?.length > 0 && (
-                <div style={{ background: '#1a1a2e', borderRadius: '12px', padding: '1.5rem', marginBottom: '1.5rem' }}>
-                    <h3 style={{ marginTop: 0 }}>Tournaments ({team.tournaments.length})</h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                        {team.tournaments.map(t => (
-                            <div
-                                key={t.id}
-                                onClick={() => navigate(`/tournaments/${t.id}`)}
-                                style={{
-                                    display: 'flex', alignItems: 'center', gap: '0.8rem',
-                                    padding: '0.6rem', background: '#0f0f23', borderRadius: '8px',
-                                    cursor: 'pointer', border: '1px solid #2a2a4a'
-                                }}
-                            >
-                                <span style={{ flex: 1 }}>{t.name}</span>
-                                <span style={{ color: '#EAEAEA', fontSize: '0.8rem' }}>{t.game}</span>
-                                <span style={{
-                                    fontSize: '0.75rem', padding: '2px 8px', borderRadius: '4px',
-                                    background: t.status === 'open' ? '#22c55e22' : t.status === 'ongoing' ? '#f59e0b22' : '#a1a1a122',
-                                    color: t.status === 'open' ? '#22c55e' : t.status === 'ongoing' ? '#f59e0b' : '#a1a1a1'
-                                }}>
-                                    {t.status === 'open' ? 'Open' : t.status === 'ongoing' ? 'Ongoing' : 'Finished'}
-                                </span>
-                            </div>
-                        ))}
+            {team.tournaments?.length > 0 && (() => {
+                const active = team.tournaments.filter(t => t.status !== 'finished');
+                const past   = team.tournaments.filter(t => t.status === 'finished');
+                return (
+                    <div style={{ background: '#1a1a2e', borderRadius: '12px', padding: '1.5rem', marginBottom: '1.5rem' }}>
+                        <h3 style={{ marginTop: 0 }}>Tournaments</h3>
+
+                        {active.length > 0 && (
+                            <>
+                                <p style={{ color: '#888', fontSize: '0.85rem', marginBottom: '0.5rem' }}>Active tournaments</p>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: past.length > 0 ? '1rem' : 0 }}>
+                                    {active.map(t => <TournamentRow key={t.id} t={t} navigate={navigate} />)}
+                                </div>
+                            </>
+                        )}
+
+                        {past.length > 0 && (
+                            <>
+                                <p style={{ color: '#888', fontSize: '0.85rem', marginBottom: '0.5rem' }}>Past tournaments</p>
+                                <div style={{ opacity: 0.6, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                    {past.map(t => <TournamentRow key={t.id} t={t} navigate={navigate} />)}
+                                </div>
+                            </>
+                        )}
                     </div>
-                </div>
-            )}
+                );
+            })()}
 
             {/* Pending requests (manager only) */}
             {isManager && (
@@ -323,6 +322,29 @@ export default function TeamDetailPage() {
                     </div>
                 </div>
             )}
+        </div>
+    );
+}
+
+function TournamentRow({ t, navigate }) {
+    return (
+        <div
+            onClick={() => navigate(`/tournaments/${t.id}`)}
+            style={{
+                display: 'flex', alignItems: 'center', gap: '0.8rem',
+                padding: '0.6rem', background: '#0f0f23', borderRadius: '8px',
+                cursor: 'pointer', border: '1px solid #2a2a4a'
+            }}
+        >
+            <span style={{ flex: 1 }}>{t.name}</span>
+            <span style={{ color: '#EAEAEA', fontSize: '0.8rem' }}>{t.game}</span>
+            <span style={{
+                fontSize: '0.75rem', padding: '2px 8px', borderRadius: '4px',
+                background: t.status === 'open' ? '#22c55e22' : t.status === 'ongoing' ? '#f59e0b22' : '#a1a1a122',
+                color: t.status === 'open' ? '#22c55e' : t.status === 'ongoing' ? '#f59e0b' : '#a1a1a1'
+            }}>
+                {t.status === 'open' ? 'Open' : t.status === 'ongoing' ? 'Ongoing' : 'Finished'}
+            </span>
         </div>
     );
 }
