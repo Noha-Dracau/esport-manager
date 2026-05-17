@@ -30,7 +30,7 @@ router.get('/:id', (req, res) => {
     if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
 
     const registrations = db.prepare(`
-    SELECT r.*, u.username, u.avatar_url, t.name as team_name, t.logo_url as team_logo
+    SELECT r.*, u.username, u.avatar_url, u.discord_username, t.name as team_name, t.logo_url as team_logo
     FROM registrations r
     LEFT JOIN users u ON r.user_id = u.id
     LEFT JOIN teams t ON r.team_id = t.id

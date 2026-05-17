@@ -235,7 +235,7 @@ export default function PresentationPage() {
                                 margin: 0,
                             }}
                         >
-                            Feel free to follow me through my personal social media or contact me via my email!
+                            Contact me via my email of feel free to follow me through my personal social media!
                         </p>
 
                         <div
@@ -246,6 +246,10 @@ export default function PresentationPage() {
                             }}
                         >
                             {[
+                                {
+                                    name: 'Email',
+                                    link: 'mailto:noha.robertaltese@gmail.com',
+                                },
                                 {
                                     name: 'YouTube',
                                     link: 'https://www.youtube.com/@Dracau_verwatch',
@@ -259,8 +263,8 @@ export default function PresentationPage() {
                                     link: 'https://www.instagram.com/dracau_noha',
                                 },
                                 {
-                                    name: 'Email',
-                                    link: 'mailto:noha.robertaltese@gmail.com',
+                                    name: 'Discord server (Tenegood)',
+                                    link: 'https://discord.com/invite/JJsexG3xTM',
                                 },
                             ].map((social, index) => (
                                 <a

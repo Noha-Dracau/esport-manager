@@ -2,15 +2,17 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
+import DiscordBadge from '../components/DiscordBadge';
 
 export default function ProfilePage() {
     const { user, logout, refreshUser } = useAuth();
     const navigate = useNavigate();
-    const [profile, setProfile]   = useState(null);
-    const [username, setUsername] = useState('');
-    const [avatar, setAvatar]     = useState(null);
-    const [error, setError]       = useState('');
-    const [success, setSuccess]   = useState('');
+    const [profile, setProfile]               = useState(null);
+    const [username, setUsername]             = useState('');
+    const [discordUsername, setDiscordUsername] = useState('');
+    const [avatar, setAvatar]                 = useState(null);
+    const [error, setError]                   = useState('');
+    const [success, setSuccess]               = useState('');
     const [team, setTeam] = useState(null);
     const [myTournaments, setMyTournaments] = useState(null);
 
@@ -18,6 +20,7 @@ export default function ProfilePage() {
         const res = await api.get('/users/me');
         setProfile(res.data);
         setUsername(res.data.username);
+        setDiscordUsername(res.data.discord_username ?? '');
 
         // Gets the data from user's team (if they have one)
         if (res.data.team_id) {
@@ -37,6 +40,9 @@ export default function ProfilePage() {
             const formData = new FormData();
             if (username !== profile.username) formData.append('username', username);
             if (avatar) formData.append('avatar', avatar);
+            const normalizedDiscord = discordUsername.trim();
+            if (normalizedDiscord !== (profile.discord_username ?? ''))
+                formData.append('discord_username', normalizedDiscord);
 
             if ([...formData.entries()].length === 0)
                 return setError('No change to update');
@@ -88,6 +94,10 @@ export default function ProfilePage() {
                     }
                 </div>
                 <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                        <span style={{ color: '#EAEAEA', fontWeight: 'bold', fontSize: '1.1rem' }}>{profile.username}</span>
+                        <DiscordBadge username={profile.discord_username} />
+                    </div>
                     <p style={{ color: '#EAEAEA', margin: '0 0 0.4rem' }}>Change picture:</p>
                     <input
                         type="file"
@@ -110,6 +120,15 @@ export default function ProfilePage() {
                     value={username}
                     onChange={e => setUsername(e.target.value)}
                     maxLength={30}
+                    style={inputStyle}
+                />
+
+                <label style={{ color: '#888', display: 'block', marginBottom: '0.3rem' }}>Discord username <span style={{ color: '#5865F2', fontSize: '0.75rem' }}>(optional)</span></label>
+                <input
+                    value={discordUsername}
+                    onChange={e => setDiscordUsername(e.target.value)}
+                    placeholder="discord_username"
+                    maxLength={32}
                     style={inputStyle}
                 />
 

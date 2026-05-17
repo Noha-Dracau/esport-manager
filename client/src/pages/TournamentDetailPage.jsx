@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 import TournamentBracket from '../components/TournamentBracket';
 import Podium from '../components/Podium';
+import DiscordBadge from '../components/DiscordBadge';
 import { Link } from 'react-router-dom';
 import { GAMES } from '../constants/games';
 
@@ -296,7 +297,10 @@ export default function TournamentDetailPage() {
                                             background: '#2a2a4a', display: 'flex', alignItems: 'center', justifyContent: 'center'
                                         }}>{r.username?.[0]?.toUpperCase()}</div>
                                     )}
-                                    <span style={{ flex: 1 }}>{r.username}</span>
+                                    <span style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        {r.username}
+                                        <DiscordBadge username={r.discord_username} />
+                                    </span>
                                 </>
                             ) : (
                                 <Link

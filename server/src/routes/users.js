@@ -6,7 +6,7 @@ const { uploadSingle, saveImage, deleteUpload } = require('../middleware/upload'
 // GET /api/users/me - connected user profile
 router.get('/me', auth, (req, res) => {
   const user = db.prepare(
-    'SELECT id, email, username, avatar_url, team_id FROM users WHERE id = ?'
+    'SELECT id, email, username, avatar_url, team_id, discord_username FROM users WHERE id = ?'
   ).get(req.user.id);
   res.json(user);
 });
@@ -43,17 +43,24 @@ router.get('/me/tournaments', auth, (req, res) => {
 // GET /api/users/:id — profil public d'un utilisateur
 router.get('/:id', (req, res) => {
   const user = db.prepare(
-      'SELECT id, username, avatar_url FROM users WHERE id = ?'
+      'SELECT id, username, avatar_url, discord_username FROM users WHERE id = ?'
   ).get(req.params.id);
   if (!user) return res.status(404).json({ error: 'Utilisateur introuvable' });
   res.json(user);
 });
 
+const DISCORD_USERNAME_REGEX = /^[a-z0-9_.]{2,32}$/;
+
 // PATCH /api/users/me - change profile
 router.patch('/me', auth, uploadSingle('avatar'), async (req, res) => {
-  const { username } = req.body;
+  const { username, discord_username } = req.body;
+
   if (username && username.length > 30)
     return res.status(400).json({ error: "Field 'username' must not exceed 30 characters" });
+
+  const discordRaw = discord_username !== undefined ? discord_username.trim() : undefined;
+  if (discordRaw && !DISCORD_USERNAME_REGEX.test(discordRaw))
+    return res.status(400).json({ error: "Discord username must be 2-32 characters (lowercase letters, digits, underscore, period only)" });
 
   if (req.file) {
     const current = db.prepare('SELECT avatar_url FROM users WHERE id = ?').get(req.user.id);
@@ -64,8 +71,12 @@ router.patch('/me', auth, uploadSingle('avatar'), async (req, res) => {
   const fields = [];
   const params = [];
 
-  if (username)   { fields.push('username = ?');   params.push(username); }
-  if (avatar_url) { fields.push('avatar_url = ?'); params.push(avatar_url); }
+  if (username)              { fields.push('username = ?');          params.push(username); }
+  if (avatar_url)            { fields.push('avatar_url = ?');        params.push(avatar_url); }
+  if (discordRaw !== undefined) {
+    fields.push('discord_username = ?');
+    params.push(discordRaw === '' ? null : discordRaw);
+  }
 
   if (fields.length === 0)
     return res.status(400).json({ error: 'Nothing to modify!' });
