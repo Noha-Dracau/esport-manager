@@ -135,19 +135,30 @@ export default function TournamentDetailPage() {
                     ) : (
                         <h1 style={{ margin: '0 0 0.5rem' }}>{tournament.name}</h1>
                     )}
-                    <p style={{ color: '#FCA616', margin: '0.2rem 0' }}>{tournament.game}</p>
-                    <p style={{ color: '#EAEAEA', margin: '0.2rem 0' }}>{new Date(tournament.date).toLocaleDateString('fr-FR')}</p>
-                    <p style={{ color: '#EAEAEA', margin: '0.2rem 0' }}>{tournament.format.replace(/_/g, ' ')}</p>
-                    <p style={{ color: '#EAEAEA', margin: '0.2rem 0' }}>
-                        {tournament.mode === 'players' ? 'Players VS Players' : 'Teams VS Teams'}
-                    </p>
-                    <span style={{
-                        background: tournament.status === 'open' ? '#22c55e22' : tournament.status === 'ongoing' ? '#f59e0b22' : '#a1a1a122',
-                        color: tournament.status === 'open' ? '#22c55e' : tournament.status === 'ongoing' ? '#f59e0b' : '#a1a1a1',
-                        padding: '2px 10px', borderRadius: '4px', fontSize: '0.8rem'
-                    }}>
-                        {tournament.status === 'open' ? 'Open' : tournament.status === 'ongoing' ? 'Ongoing' : 'Finished'}
-                    </span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                            <p style={{ color: '#FCA616', margin: '0.2rem 0' }}>{tournament.game}</p>
+                            <p style={{ color: '#EAEAEA', margin: '0.2rem 0' }}>{new Date(tournament.date).toLocaleDateString('fr-FR')}</p>
+                            <p style={{ color: '#EAEAEA', margin: '0.2rem 0' }}>{tournament.format.replace(/_/g, ' ')}</p>
+                            <p style={{ color: '#EAEAEA', margin: '0.2rem 0' }}>
+                                {tournament.mode === 'players' ? 'Players VS Players' : 'Teams VS Teams'}
+                            </p>
+                            <span style={{
+                                background: tournament.status === 'open' ? '#22c55e22' : tournament.status === 'ongoing' ? '#f59e0b22' : '#a1a1a122',
+                                color: tournament.status === 'open' ? '#22c55e' : tournament.status === 'ongoing' ? '#f59e0b' : '#a1a1a1',
+                                padding: '2px 10px', borderRadius: '4px', fontSize: '0.8rem'
+                            }}>
+                                {tournament.status === 'open' ? 'Open' : tournament.status === 'ongoing' ? 'Ongoing' : 'Finished'}
+                            </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.9rem', flexShrink: 0 }}>
+                            <span style={{ color: '#a1a1a1' }}>Manager:</span>
+                            <span style={{ color: '#EAEAEA' }}>{tournament.manager_username}</span>
+                            {tournament.manager_discord_username && (
+                                <DiscordBadge username={tournament.manager_discord_username} />
+                            )}
+                        </div>
+                    </div>
                 </div>
 
                 {/* Buttons manager only */}

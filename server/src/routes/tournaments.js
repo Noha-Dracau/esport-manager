@@ -26,7 +26,12 @@ router.get('/games', (req, res) => {
 
 // GET /api/tournaments/:id - details + participants
 router.get('/:id', (req, res) => {
-    const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(req.params.id);
+    const tournament = db.prepare(`
+        SELECT t.*, u.username AS manager_username, u.discord_username AS manager_discord_username
+        FROM tournaments t
+        LEFT JOIN users u ON u.id = t.manager_id
+        WHERE t.id = ?
+    `).get(req.params.id);
     if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
 
     const registrations = db.prepare(`
