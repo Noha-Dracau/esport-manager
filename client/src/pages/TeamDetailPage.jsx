@@ -5,7 +5,7 @@ import api from '../api/axios';
 
 export default function TeamDetailPage() {
     const { id } = useParams();
-    const { user } = useAuth();
+    const { user, refreshUser } = useAuth();
     const navigate = useNavigate();
     const [team, setTeam]       = useState(null);
     const [error, setError]     = useState('');
@@ -55,6 +55,7 @@ export default function TeamDetailPage() {
         if (!confirm('Leave this team?')) return;
         try {
             await api.post(`/teams/${id}/leave`);
+            await refreshUser();
             navigate('/teams');
         } catch (err) { setError(err.response?.data?.error || 'Error'); }
     }
@@ -71,6 +72,7 @@ export default function TeamDetailPage() {
         if (!confirm('Delete the team (no going back)?')) return;
         try {
             await api.delete(`/teams/${id}`);
+            await refreshUser();
             navigate('/teams');
         } catch (err) { setError(err.response?.data?.error || 'Error'); }
     }

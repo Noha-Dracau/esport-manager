@@ -173,7 +173,7 @@ export default function ManageTournamentPage() {
                 }}>
                     {tournament.format === 'round_robin'
                         ? 'The schedule will be generated automatically on start. All participants will meet once.'
-                        : 'The bracket will be locked on start. Check the seeding (drag & drop on the public page) before clicking "Start".'}
+                        : 'Generate the bracket on the public page first, then check the seeding (drag & drop) before clicking "Start". Any registration or unregistration after generation will reset the bracket.'}
                 </div>
             )}
 

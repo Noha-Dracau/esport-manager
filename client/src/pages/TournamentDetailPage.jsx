@@ -266,8 +266,13 @@ export default function TournamentDetailPage() {
                 </div>
             )}
 
+            {/* Podium */}
+            {!editing && tournament.status === 'finished' && (
+                <Podium tournament={tournament} />
+            )}
+
             {/* List of participants */}
-            {!editing && <div style={{ background: '#1a1a2e', borderRadius: '12px', padding: '1.5rem' }}>
+            {!editing && <div style={{ background: '#1a1a2e', borderRadius: '12px', padding: '1.5rem', marginTop: '1.5rem' }}>
                 <h3 style={{ marginTop: 0 }}>
                     Participants ({tournament.registrations?.length} / {tournament.max_participants})
                 </h3>
@@ -332,11 +337,6 @@ export default function TournamentDetailPage() {
                     ))}
                 </div>
             </div>}
-
-            {/* Podium */}
-            {!editing && tournament.status === 'finished' && (
-                <Podium tournament={tournament} />
-            )}
 
             {/* Bracket */}
             {!editing && <TournamentBracket

@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 
 export default function ProfilePage() {
-    const { user, logout } = useAuth();
+    const { user, logout, refreshUser } = useAuth();
     const navigate = useNavigate();
     const [profile, setProfile]   = useState(null);
     const [username, setUsername] = useState('');
@@ -44,6 +44,7 @@ export default function ProfilePage() {
             await api.patch('/users/me', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
+            await refreshUser();
             setSuccess('Profile updated!');
             fetchProfile();
         } catch (err) {

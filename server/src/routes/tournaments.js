@@ -111,6 +111,9 @@ router.post('/:id/register', auth, (req, res) => {
         ).run(req.params.id, req.user.id);
     }
 
+    // Invalide le bracket : il ne reflète plus la liste des inscrits
+    db.prepare('DELETE FROM matches WHERE tournament_id = ?').run(req.params.id);
+
     res.json({ success: true });
 });
 // PATCH /api/tournaments/:id - modify a tournament (manager only)
@@ -177,7 +180,7 @@ router.delete('/:id', auth, (req, res) => {
 // DELETE /api/tournaments/:id/unregister - cancel the registration
 router.delete('/:id/unregister', auth, (req, res) => {
     const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(req.params.id);
-    if (!tournament) return res.status(404).json({ error: 'Unfound tournament' });
+    if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
     if (tournament.status !== 'open')
         return res.status(400).json({ error: 'Cannot unregister from a tournament that has already started' });
 
@@ -193,6 +196,9 @@ router.delete('/:id/unregister', auth, (req, res) => {
         db.prepare('DELETE FROM registrations WHERE tournament_id = ? AND team_id = ?')
             .run(req.params.id, user.team_id);
     }
+
+    // Invalide le bracket : il ne reflète plus la liste des inscrits
+    db.prepare('DELETE FROM matches WHERE tournament_id = ?').run(req.params.id);
 
     res.json({ success: true });
 });

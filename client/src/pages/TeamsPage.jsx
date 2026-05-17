@@ -11,7 +11,7 @@ export default function TeamsPage() {
     const [logo, setLogo]           = useState(null);
     const [error, setError]         = useState('');
     const [success, setSuccess]     = useState('');
-    const { user } = useAuth();
+    const { user, refreshUser } = useAuth();
     const navigate = useNavigate();
 
     async function fetchTeams() {
@@ -33,6 +33,7 @@ export default function TeamsPage() {
             await api.post('/teams', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
+            await refreshUser();
             setSuccess('Team created successfully!');
             setShowForm(false);
             setTeamName('');
