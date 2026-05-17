@@ -1,4 +1,3 @@
-// client/src/pages/ManageTournamentPage.jsx
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import api from '../api/axios';
@@ -52,7 +51,7 @@ export default function ManageTournamentPage() {
     }
 
     async function handleFinish() {
-        // Vérifie s'il reste des matchs non joués pour adapter la confirmation
+        // check for unfinished matches to tailor the confirmation message
         let unfinishedCount = 0;
         try {
             const res = await api.get(`/tournaments/${id}/bracket`);

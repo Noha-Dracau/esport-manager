@@ -22,7 +22,6 @@ export default function ProfilePage() {
         setUsername(res.data.username);
         setDiscordUsername(res.data.discord_username ?? '');
 
-        // Gets the data from user's team (if they have one)
         if (res.data.team_id) {
             const teamRes = await api.get(`/teams/${res.data.team_id}`);
             setTeam(teamRes.data);
